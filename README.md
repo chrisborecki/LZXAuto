@@ -19,6 +19,8 @@ Default value: /log:General,Stat
 
 filePath - root path to start. All subdirectories will be traversed. Default is current drive.
 
+
+
 Description:
 
 Windows 10 extended NTFS compression with LZX alghorithm. 
