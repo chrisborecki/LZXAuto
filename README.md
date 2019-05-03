@@ -1,5 +1,5 @@
 # LZXCompactLight
-Compress files to NTFS LZX compression with minimal disk write cycles.
+Compress files to NTFS LZX compression with minimal disk write cycles (keeps list of uncompressible files).
                 
 Syntax: LZXCompactLight [/log:mode] [/resetDb] [/scheduleOn] [/scheduleOff] [/? | /help] [filePath]
 
@@ -20,6 +20,7 @@ Default value: /log:General,Stat
 filePath - root path to start. All subdirectories will be traversed. Default is current drive.
 
 Description:
+
 Windows 10 extended NTFS compression with LZX alghorithm. 
 Files compressed with LZX can be opened like any other file, the uncompressing operation is transparent.
 Compressing files, however, can be done only by running Compact command line. 
