@@ -31,7 +31,7 @@ When Compact command is being run on file already LZX-compressed, it will not tr
 However, if file is not compressible, Compact will try to recompress it every time, writing temp data to disk.
 
 This is an issue on SSD drives, because of limited write cycles.
-LZXCompactLight keeps record of file name and its last seen size. If the file has not changed since last LZXCompactLight run, attempt for recomressing will not be made. 
+LZXCompactLight keeps record of file name and its last seen size. If the file has not changed since last LZXCompactLight run, attempt for recompressing will not be made. 
 This saves SSD write cycles and speeds up processing time.
 Iterating through files is multithreaded, one file per CPU logical core.
 
