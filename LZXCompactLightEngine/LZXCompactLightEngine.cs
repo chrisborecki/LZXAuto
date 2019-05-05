@@ -11,33 +11,31 @@ namespace LZXCompactLightEngine
 {
     public class LZXCompactLightEngine
     {
+        private const int treadPoolWaitMs = 200;
+        private const int fileSaveTimerMs = (int)30e3; //30 seconds
         private const string dbFileName = "FileDict.db";
         private const string logFileName = "Activity.log";
 
-        private readonly string[] skipCompression = new string[] { ".zip", ".gif", ".7z", ".bmp", ".jpeg", ".jpg", ".mov", ".mp3", ".avi", ".cab", ".mpeg" };
-        private readonly BinaryFormatter binaryFormatter = new BinaryFormatter();
+        private Timer timer;
+        private int threadQueueLength;
+        private int fileCountProcessed = 0;
+        private int fileCountSkipByNoChanges = 0;
+        private int fileCountSkippedByExtension = 0;
+        private int fileCountSkippedByAttributes = 0;
+        private ConcurrentDictionary<int, int> fileDict = new ConcurrentDictionary<int, int>();
+
         private readonly object lockObject = new object();
         private readonly int maxQueueLength = Environment.ProcessorCount * 16;
+        private readonly BinaryFormatter binaryFormatter = new BinaryFormatter();
         private readonly CancellationTokenSource cancelToken = new CancellationTokenSource();
-
-        private ConcurrentDictionary<int, int> fileDict = new ConcurrentDictionary<int, int>();
-        private int threadQueueLength = 0;
-
-        public int fileCountSkippedByAttributes = 0;
-        public int fileCountSkippedByExtension = 0;
-        public int fileCountSkipByNoChanges = 0;
-        public int fileCountProcessed = 0;
+        private readonly string[] skipCompression = new string[] { ".zip", ".gif", ".7z", ".bmp", ".jpeg", ".jpg", ".mov", ".mp3", ".avi", ".cab", ".mpeg" };
 
         public LogLevel LogLevel { get; set; } = LogLevel.General;
 
-        public int FileDictCount
+        public LZXCompactLightEngine()
         {
-            get
-            {
-                return fileDict?.Count ?? 0;
-            }
+            timer = new Timer(FileSaveTimerCallback, null, fileSaveTimerMs, fileSaveTimerMs);
         }
-
         public void ResetDb()
         {
             File.Delete(dbFileName);
@@ -48,22 +46,26 @@ namespace LZXCompactLightEngine
             Log("Terminating...", 4, LogLevel.General);
             cancelToken.Cancel();
         }
-
+    
         public void Process(string path = "c:\\")
         {
-            Log($"Starting path {path}", 2, LogLevel.General);
+            Log("Starting new session", 20);
+            Log($"Starting path {path}", 2);
 
-            DirectoryInfo diTop = new DirectoryInfo(path);
+            DateTime startTimeStamp = DateTime.Now;
 
             try
             {
-                foreach (var fi in diTop.EnumerateFiles())
+                DirectoryInfo dirTop = new DirectoryInfo(path);
+
+                LoadFromFile();
+
+                foreach (var fi in dirTop.EnumerateFiles())
                 {
                     if (cancelToken.IsCancellationRequested)
                     {
                         // wait until all threads complete
-                        WaitUntilThreadPoolComplete();
-
+                        FinalizeThreadPool();
                         break;
                     }
 
@@ -79,7 +81,7 @@ namespace LZXCompactLightEngine
                         // Do not let queue length more items than MaxQueueLength
                         while (threadQueueLength > maxQueueLength)
                         {
-                            Thread.Sleep(200);
+                            Thread.Sleep(treadPoolWaitMs);
                         }
                     }
                     catch (UnauthorizedAccessException UnAuthTop)
@@ -88,7 +90,7 @@ namespace LZXCompactLightEngine
                     }
                 }
 
-                foreach (var di in diTop.EnumerateDirectories("*"))
+                foreach (var di in dirTop.EnumerateDirectories("*"))
                 {
                     try
                     {
@@ -97,7 +99,7 @@ namespace LZXCompactLightEngine
                             if (cancelToken.IsCancellationRequested)
                             {
                                 // wait until all threads complete
-                                WaitUntilThreadPoolComplete();
+                                FinalizeThreadPool();
                                 break;
                             }
 
@@ -113,7 +115,7 @@ namespace LZXCompactLightEngine
                                 // Do not let queue length more items than MaxQueueLength
                                 while (threadQueueLength > maxQueueLength)
                                 {
-                                    Thread.Sleep(200);
+                                    Thread.Sleep(treadPoolWaitMs);
                                 }
                             }
                             catch (UnauthorizedAccessException UnAuthFile)
@@ -144,18 +146,43 @@ namespace LZXCompactLightEngine
             {
                 Log($"Other error: {ex.Message}");
             }
+            finally
+            {
+                // Wait until all threads complete
+                FinalizeThreadPool();
 
-            // wait until all threads complete
-            WaitUntilThreadPoolComplete();
+                Log("Completed");
 
-            Log("Completed");
+                SaveToFile();
+
+                TimeSpan ts = DateTime.Now.Subtract(startTimeStamp);
+                int totalFilesVisited = fileCountProcessed + fileCountSkipByNoChanges + fileCountSkippedByAttributes + fileCountSkippedByExtension;
+
+                Log(
+                    $"Stats: {Environment.NewLine}" +
+                    $"Files skipped by attributes: {fileCountSkippedByAttributes}{Environment.NewLine}" +
+                    $"Files skipped by extension: { fileCountSkippedByExtension}{Environment.NewLine}" +
+                    $"Files skipped by no change: { fileCountSkipByNoChanges}{Environment.NewLine}" +
+                    $"Files processed by compact command line: { fileCountProcessed}{Environment.NewLine}" +
+                    $"Total files visited: {totalFilesVisited}{Environment.NewLine}" +
+                    $"Files in db: {fileDict?.Count ?? 0}", 2);
+
+                Log(
+                    $"Perf stats:{Environment.NewLine}" +
+                    $"Time elapsed[hh:mm:ss:ms]: {ts.Hours.ToString("00")}:{ts.Minutes.ToString("00")}:{ts.Seconds.ToString("00")}:{ts.Milliseconds.ToString("00")}{Environment.NewLine}" +
+                    $"Files per minute: {((double)totalFilesVisited / (double)ts.TotalMinutes).ToString("0.00")}", 2);
+            }
         }
 
-        private void WaitUntilThreadPoolComplete()
+        private void FinalizeThreadPool()
         {
+            // Disable file save timer callback
+            timer.Change(Timeout.Infinite, Timeout.Infinite);
+
+            // Wait for thread pool to complete
             while (threadQueueLength > 0)
             {
-                Thread.Sleep(200);
+                Thread.Sleep(treadPoolWaitMs);
             }
         }
 
@@ -213,13 +240,12 @@ namespace LZXCompactLightEngine
             }
         }
 
-
-        public void Log(FileInfo fi, Exception ex)
+        private void Log(FileInfo fi, Exception ex)
         {
             Log($"Error during processing: file: {fi.FullName}, exception message: {ex.Message}");
         }
 
-        public void Log(string str, int newLine = 1, LogLevel level = LogLevel.General)
+        private void Log(string str, int newLinePrefix = 1, LogLevel level = LogLevel.General)
         {
             if (!LogLevel.HasFlag(level))
             {
@@ -227,7 +253,7 @@ namespace LZXCompactLightEngine
             }
 
             StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < newLine; i++, sb.AppendLine()) ;
+            for (int i = 0; i < newLinePrefix; i++, sb.AppendLine()) ;
 
             if (!string.IsNullOrEmpty(str))
                 sb.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " " + str);
@@ -246,7 +272,7 @@ namespace LZXCompactLightEngine
             }
         }
 
-        public void SaveToFile()
+        private void SaveToFile()
         {
             try
             {
@@ -268,13 +294,13 @@ namespace LZXCompactLightEngine
             }
         }
 
-        public void LoadFromFile()
+        private void LoadFromFile()
         {
             if (File.Exists(dbFileName))
             {
                 try
                 {
-                    Log("DB file found");
+                    Log("Dictionary file found");
 
                     using (FileStream readerFileStream = new FileStream(dbFileName, FileMode.Open, FileAccess.Read))
                     {
@@ -299,6 +325,12 @@ namespace LZXCompactLightEngine
             {
                 Log("DB file not found");
             }
+        }
+
+        private void FileSaveTimerCallback(object state)
+        {
+            Log("Saving dictionary file...", 1, LogLevel.Debug);
+            SaveToFile();
         }
     }
 

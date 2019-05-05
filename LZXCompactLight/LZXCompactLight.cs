@@ -9,9 +9,10 @@ namespace LZXCompactLight
 {
     class LZXCompactLight
     {
-        private readonly static LZXCompactLightEngine.LZXCompactLightEngine compressorEngine = new LZXCompactLightEngine.LZXCompactLightEngine();
-        private const string TaskScheduleTemplateFileName = "LZXCompactLightTask.xml";
         private const string TaskScheduleName = "LZXCompactLight";
+        private const string TaskScheduleTemplateFileName = "LZXCompactLightTask.xml";
+        
+        private readonly static LZXCompactLightEngine.LZXCompactLightEngine compressorEngine = new LZXCompactLightEngine.LZXCompactLightEngine();
 
         static void Main(string[] args)
         {
@@ -89,7 +90,7 @@ LZXCompactLight /scheduleOn c:\
                         LogLevel lm = LogLevel.General;
                         if (!Enum.TryParse<LogLevel>(modeVal, true, out lm))
                         {
-                            compressorEngine.Log($"Unrecognised log level value: {modeVal}");
+                            Console.WriteLine($"Unrecognised log level value: {modeVal}");
                             return;
                         }
 
@@ -127,9 +128,9 @@ LZXCompactLight /scheduleOn c:\
                 string newArgumentsNode = $"<Arguments>{requestedPath}</Arguments>";
                 string newWorkingDirectoryNode = $"<WorkingDirectory>{Path.GetDirectoryName(currentProcessPath)}</WorkingDirectory>";
 
-                ReplaceText(TaskScheduleTemplateFileName, "<Command></Command>", newCommandNode);
-                ReplaceText(TaskScheduleTemplateFileName, "<Arguments></Arguments>", newArgumentsNode);
-                ReplaceText(TaskScheduleTemplateFileName, "<WorkingDirectory></WorkingDirectory>", newWorkingDirectoryNode);
+                ReplaceTextInFile(TaskScheduleTemplateFileName, "<Command></Command>", newCommandNode);
+                ReplaceTextInFile(TaskScheduleTemplateFileName, "<Arguments></Arguments>", newArgumentsNode);
+                ReplaceTextInFile(TaskScheduleTemplateFileName, "<WorkingDirectory></WorkingDirectory>", newWorkingDirectoryNode);
 
                 try
                 {
@@ -154,9 +155,9 @@ LZXCompactLight /scheduleOn c:\
                 }
                 finally
                 {
-                    ReplaceText(TaskScheduleTemplateFileName, newCommandNode, "<Command></Command>");
-                    ReplaceText(TaskScheduleTemplateFileName, newArgumentsNode, "<Arguments></Arguments>");
-                    ReplaceText(TaskScheduleTemplateFileName, newWorkingDirectoryNode, "<WorkingDirectory></WorkingDirectory>");
+                    ReplaceTextInFile(TaskScheduleTemplateFileName, newCommandNode, "<Command></Command>");
+                    ReplaceTextInFile(TaskScheduleTemplateFileName, newArgumentsNode, "<Arguments></Arguments>");
+                    ReplaceTextInFile(TaskScheduleTemplateFileName, newWorkingDirectoryNode, "<WorkingDirectory></WorkingDirectory>");
                 }
 
                 return;
@@ -183,44 +184,16 @@ LZXCompactLight /scheduleOn c:\
                 return;
             }
 
-            compressorEngine.Log("Starting new session", 20);
-            compressorEngine.LoadFromFile();
-
-            DateTime timeStamp = DateTime.Now;
-            try
-            {
-                compressorEngine.Process(commandLineRequestedPath);
-            }
-            finally
-            {
-                compressorEngine.SaveToFile();
-
-                TimeSpan ts = DateTime.Now.Subtract(timeStamp);
-                int totalFiles = compressorEngine.fileCountProcessed + compressorEngine.fileCountSkipByNoChanges + compressorEngine.fileCountSkippedByAttributes + compressorEngine.fileCountSkippedByExtension;
-
-                compressorEngine.Log(
-                    $"Stats: {Environment.NewLine}" +
-                    $"Files skipped by attributes: {compressorEngine.fileCountSkippedByAttributes}{Environment.NewLine}" +
-                    $"Files skipped by extension: {compressorEngine.fileCountSkippedByExtension}{Environment.NewLine}" +
-                    $"Files skipped by no change: { compressorEngine.fileCountSkipByNoChanges}{Environment.NewLine}" +
-                    $"Files processed by compact command line: {compressorEngine.fileCountProcessed}{Environment.NewLine}" +
-                    $"Total files visited: {totalFiles}{Environment.NewLine}" +
-                    $"Files in db: {compressorEngine.FileDictCount}", 2);
-
-                compressorEngine.Log(
-                    $"Perf stats:{Environment.NewLine}" +
-                    $"Time elapsed[hh:mm:ss:ms]: {ts.Hours.ToString("00")}:{ts.Minutes.ToString("00")}:{ts.Seconds.ToString("00")}:{ts.Milliseconds.ToString("00")}{Environment.NewLine}" +
-                    $"Files per minute: {((double)totalFiles / (double)ts.TotalMinutes).ToString("0.00")}", 2);
-            }
+            compressorEngine.Process(commandLineRequestedPath);
         }
 
-        protected static void ConsoleTerminateHandler(object sender, ConsoleCancelEventArgs args)
+        private static void ConsoleTerminateHandler(object sender, ConsoleCancelEventArgs args)
         {
             args.Cancel = true;
             compressorEngine.Cancel();
         }
 
-        private static void ReplaceText(string fileName, string sourceText, string replacementText)
+        private static void ReplaceTextInFile(string fileName, string sourceText, string replacementText)
         {
             string text = File.ReadAllText(fileName);
             text = text.Replace(sourceText, replacementText);
