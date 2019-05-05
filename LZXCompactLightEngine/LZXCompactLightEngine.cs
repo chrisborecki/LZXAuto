@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Threading;
@@ -49,7 +50,7 @@ namespace LZXCompactLightEngine
     
         public void Process(string path = "c:\\")
         {
-            Log("Starting new session", 20);
+            Log($"Starting new compressing session. LZXCompactLight version: {Assembly.GetEntryAssembly().GetName().Version}", 20);
             Log($"Starting path {path}", 2);
 
             DateTime startTimeStamp = DateTime.Now;
