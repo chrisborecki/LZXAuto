@@ -3,6 +3,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
 
 namespace LZXCompactLight
@@ -59,6 +60,8 @@ Iterating through files is multithreaded, one file per CPU logical core.
 
 Typical use:
 LZXCompactLight /scheduleOn c:\ 
+
+Version number: {Assembly.GetEntryAssembly().GetName().Version}
 ");
 
                 return;
