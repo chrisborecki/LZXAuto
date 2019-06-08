@@ -17,6 +17,13 @@ namespace LZXCompactLight
 
         static void Main(string[] args)
         {
+            string thisprocessname = Process.GetCurrentProcess().ProcessName;
+            if (Process.GetProcesses().Count(p => p.ProcessName == thisprocessname) > 1)
+            {
+                compressorEngine.Log("Another instance is already running. Exiting...", 2, LogFlags.General);
+                return;
+            }
+
             Console.CancelKeyPress += new ConsoleCancelEventHandler(ConsoleTerminateHandler);
 
             // Parse help option
@@ -29,9 +36,9 @@ Syntax: LZXCompactLight [/log:mode] [/resetDb] [/scheduleOn] [/scheduleOff] [/? 
 
 Options:
 
-/log: None, General, Stat, FileCompacing, FileSkipping, Debug - log level (comma separated list).
-General and Stat levels are outputed to the console, other levels to log file only.
-Default value: /log:General,Stat
+/log: None, General, Stat, FileCompacing, FileSkipping, Debug - log flags (comma separated list).
+General and Stat levels are outputed to both log file and the console, other levels to log file only.
+Default value: /log:General, Stat
 
 /resetDb - resets db. On next run, all files will be traversed by Compact command.
 
@@ -74,7 +81,7 @@ Version number: {Assembly.GetEntryAssembly().GetName().Version}
                 return;
             }
 
-            compressorEngine.LogLevel = LogLevel.General | LogLevel.Stat;
+            compressorEngine.LogFlags = LogFlags.General | LogFlags.Stat;
 
             // Parse log level option, like: /q:general,stat,fileskipping
             foreach (string arg in args)
@@ -83,21 +90,21 @@ Version number: {Assembly.GetEntryAssembly().GetName().Version}
                 var match = rx.Match(arg);
                 if (match.Success)
                 {
-                    compressorEngine.LogLevel = LogLevel.None;
+                    compressorEngine.LogFlags = LogFlags.None;
 
                     string modeStr = match.Groups?["mode"]?.Value;
                     string[] modeArr = modeStr.Split(',');
 
                     foreach (string modeVal in modeArr)
                     {
-                        LogLevel lm = LogLevel.General;
-                        if (!Enum.TryParse<LogLevel>(modeVal, true, out lm))
+                        LogFlags lm = LogFlags.General;
+                        if (!Enum.TryParse<LogFlags>(modeVal, true, out lm))
                         {
                             Console.WriteLine($"Unrecognised log level value: {modeVal}");
                             return;
                         }
 
-                        compressorEngine.LogLevel |= lm;
+                        compressorEngine.LogFlags |= lm;
                     }
                 }
             }

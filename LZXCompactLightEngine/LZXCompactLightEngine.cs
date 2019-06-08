@@ -31,7 +31,7 @@ namespace LZXCompactLightEngine
         private readonly CancellationTokenSource cancelToken = new CancellationTokenSource();
         private readonly string[] skipCompression = new string[] { ".zip", ".gif", ".7z", ".bmp", ".jpeg", ".jpg", ".mov", ".mp3", ".avi", ".cab", ".mpeg" };
 
-        public LogLevel LogLevel { get; set; } = LogLevel.General;
+        public LogFlags LogFlags { get; set; } = LogFlags.General;
 
         public LZXCompactLightEngine()
         {
@@ -44,7 +44,7 @@ namespace LZXCompactLightEngine
 
         public void Cancel()
         {
-            Log("Terminating...", 4, LogLevel.General);
+            Log("Terminating...", 4, LogFlags.General);
             cancelToken.Cancel();
         }
     
@@ -175,6 +175,38 @@ namespace LZXCompactLightEngine
             }
         }
 
+        public void Log(FileInfo fi, Exception ex)
+        {
+            Log($"Error during processing: file: {fi.FullName}, exception message: {ex.Message}");
+        }
+
+        public void Log(string str, int newLinePrefix = 1, LogFlags level = LogFlags.General)
+        {
+            if (!LogFlags.HasFlag(level))
+            {
+                return;
+            }
+
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < newLinePrefix; i++, sb.AppendLine());
+
+            if (!string.IsNullOrEmpty(str))
+                sb.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " " + str);
+
+            string result = sb.ToString();
+
+            if (LogFlags.HasFlag(LogFlags.General) && level.HasFlag(LogFlags.General) ||
+                LogFlags.HasFlag(LogFlags.Stat) && level.HasFlag(LogFlags.Stat))
+            {
+                Console.WriteLine(result);
+            }
+
+            lock (lockObject)
+            {
+                File.AppendAllText(logFileName, result);
+            }
+        }
+
         private void FinalizeThreadPool()
         {
             // Disable file save timer callback
@@ -205,21 +237,21 @@ namespace LZXCompactLightEngine
 
                 if (fi.Length > 0)
                 {
-                    Log("", 4, LogLevel.FileCompacting | LogLevel.FileSkipping);
+                    Log("", 4, LogFlags.FileCompacting | LogFlags.FileSkipping);
 
                     int filePathHash = fi.FullName.GetHashCode();
 
                     int fileSizeHash;
                     if (fileDict.TryGetValue(filePathHash, out fileSizeHash) && fileSizeHash == fi.Length.GetHashCode())
                     {
-                        Log($"Skipping file: ${fi.FullName} because it has been visited already and its size did not change", 1, LogLevel.FileSkipping);
+                        Log($"Skipping file: ${fi.FullName} because it has been visited already and its size did not change", 1, LogFlags.FileSkipping);
                         Interlocked.Increment(ref fileCountSkipByNoChanges);
                         return;
                     }
 
                     fileDict[filePathHash] = fi.Length.GetHashCode();
 
-                    Log($"Compressing file {fi.FullName}", 1, LogLevel.FileCompacting);
+                    Log($"Compressing file {fi.FullName}", 1, LogFlags.FileCompacting);
                     Interlocked.Increment(ref fileCountProcessed);
 
                     var proc = new Process();
@@ -232,44 +264,12 @@ namespace LZXCompactLightEngine
                     proc.WaitForExit();
                     proc.Close();
 
-                    Log(outPut, 2, LogLevel.Debug);
+                    Log(outPut, 2, LogFlags.Debug);
                 }
             }
             finally
             {
                 Interlocked.Decrement(ref threadQueueLength);
-            }
-        }
-
-        private void Log(FileInfo fi, Exception ex)
-        {
-            Log($"Error during processing: file: {fi.FullName}, exception message: {ex.Message}");
-        }
-
-        private void Log(string str, int newLinePrefix = 1, LogLevel level = LogLevel.General)
-        {
-            if (!LogLevel.HasFlag(level))
-            {
-                return;
-            }
-
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < newLinePrefix; i++, sb.AppendLine()) ;
-
-            if (!string.IsNullOrEmpty(str))
-                sb.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " " + str);
-
-            string result = sb.ToString();
-
-            if (LogLevel.HasFlag(LogLevel.General) && level.HasFlag(LogLevel.General) ||
-                LogLevel.HasFlag(LogLevel.Stat) && level.HasFlag(LogLevel.Stat))
-            {
-                Console.WriteLine(result);
-            }
-
-            lock (lockObject)
-            {
-                File.AppendAllText(logFileName, result);
             }
         }
 
@@ -319,7 +319,7 @@ namespace LZXCompactLightEngine
                     Log($"Error during loading from file: {ex.Message}" +
                         $"{Environment.NewLine}Terminating.");
 
-                    Environment.Exit(0);
+                    Environment.Exit(-1);
                 }
             }
             else
@@ -330,13 +330,13 @@ namespace LZXCompactLightEngine
 
         private void FileSaveTimerCallback(object state)
         {
-            Log("Saving dictionary file...", 1, LogLevel.Debug);
+            Log("Saving dictionary file...", 1, LogFlags.Debug);
             SaveToFile();
         }
     }
 
     [Flags]
-    public enum LogLevel
+    public enum LogFlags
     {
         None = 0,
         General = 1,
