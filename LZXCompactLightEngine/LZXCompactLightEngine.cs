@@ -277,7 +277,7 @@ namespace LZXCompactLightEngine
         {
             try
             {
-                Log("Saving file...");
+                Log("Saving file...", 1, LogFlags.Debug);
                 lock (lockObject)
                 {
                     using (FileStream writerFileStream = new FileStream(dbFileName, FileMode.Create, FileAccess.Write))
@@ -287,7 +287,7 @@ namespace LZXCompactLightEngine
                     }
                 }
 
-                Log("File saved");
+                Log("File saved", 1, LogFlags.Debug);
             }
             catch (Exception ex)
             {

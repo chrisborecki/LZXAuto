@@ -48,13 +48,13 @@ Default value: /log:General, Stat
 
 /? or /help - displays this help screen
 
-filePath - root path to start. All subdirectories will be traversed. Default is current drive.
+filePath - root path to start. All subdirectories will be traversed. Default is root of current drive, like c:\.
 
 Description:
 Windows 10 extended NTFS compression with LZX alghorithm. 
-Files compressed with LZX can be opened like any other file, the uncompressing operation is transparent.
-Compressing files, however, can be done only by running Compact command line. 
-To keep the files compressed, windows Compact command needs to be re-run. This could be easily achieved with Task Scheduler.
+Files compressed with LZX can be opened like any other file because the uncompressing operation is transparent.
+Compressing files with LZX is CPU intensive and thus is not being done automatically. It can be done only by running Compact command line.
+To keep the files compressed, windows Compact command needs to be re-run. This can be done with Task Scheduler.
 
 There is a catch with SSD drives though.
 When Compact command is being run on file already LZX-compressed, it will not try to recompress it.
@@ -75,7 +75,7 @@ Version number: {Assembly.GetEntryAssembly().GetName().Version}
             }
 
             // Parse resetDb option
-            if (args.Contains("/resetDb"))
+            if (args.Contains("/resetDb", StringComparer.InvariantCultureIgnoreCase))
             {
                 compressorEngine.ResetDb();
                 return;
@@ -86,7 +86,7 @@ Version number: {Assembly.GetEntryAssembly().GetName().Version}
             // Parse log level option, like: /q:general,stat,fileskipping
             foreach (string arg in args)
             {
-                Regex rx = new Regex(@"/log:(?<mode>[\w,]+)", RegexOptions.IgnoreCase);
+                Regex rx = new Regex(@"/log:\s*(?<mode>[\w,]*)", RegexOptions.IgnoreCase);
                 var match = rx.Match(arg);
                 if (match.Success)
                 {
@@ -125,7 +125,7 @@ Version number: {Assembly.GetEntryAssembly().GetName().Version}
             }
 
             // Parse scheduleOn option
-            if (args.Contains("/scheduleOn"))
+            if (args.Contains("/scheduleOn", StringComparer.InvariantCultureIgnoreCase))
             {
                 var currentProcess = Process.GetCurrentProcess();
                 string currentProcessPath = currentProcess.MainModule.FileName;
@@ -158,7 +158,7 @@ Version number: {Assembly.GetEntryAssembly().GetName().Version}
                     }
                     else
                     {
-                        Console.WriteLine("Schedule initialization failed");
+                        Console.WriteLine("Schedule initialization failed"); 
                     }
 
                     proc.Close();
@@ -174,7 +174,7 @@ Version number: {Assembly.GetEntryAssembly().GetName().Version}
             }
 
             // Parse scheduleOff option
-            if (args.Contains("/scheduleOff"))
+            if (args.Contains("/scheduleOff", StringComparer.InvariantCultureIgnoreCase))
             {
                 var proc = new Process();
                 proc.StartInfo.FileName = $"schtasks";
