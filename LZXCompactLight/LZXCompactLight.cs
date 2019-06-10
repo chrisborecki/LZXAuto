@@ -1,4 +1,12 @@
-﻿using LZXCompactLightEngine;
+﻿/*  
+ *  LZX compression helper for Windows 10
+ *  Copyright (c) 2019 Christopher Borecki
+ * 
+ *  MIT Licence
+ * 
+ * */
+
+using LZXCompactLightEngine;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -25,6 +33,12 @@ namespace LZXCompactLight
             }
 
             Console.CancelKeyPress += new ConsoleCancelEventHandler(ConsoleTerminateHandler);
+
+            string commandLine = string.Empty;
+            if(args != null)
+            {
+                commandLine = string.Join(" ", args);
+            }
 
             // Parse help option
             if (args.Length == 0 || args.Contains("/?") || args.Contains("/help"))
@@ -83,21 +97,22 @@ Version number: {Assembly.GetEntryAssembly().GetName().Version}
 
             compressorEngine.LogFlags = LogFlags.General | LogFlags.Stat;
 
-            // Parse log level option, like: /q:general,stat,fileskipping
-            foreach (string arg in args)
+
+            // Parse log level option, like: /q:general, stat, fileskipping
+            if (!string.IsNullOrEmpty(commandLine))
             {
-                Regex rx = new Regex(@"/log:\s*(?<mode>[\w,]*)", RegexOptions.IgnoreCase);
-                var match = rx.Match(arg);
+                Regex rx = new Regex(@"/log:(?<mode>(\s*\w+\s*[,]{0,1})*)(?![:/])", RegexOptions.IgnoreCase);
+                var match = rx.Match(commandLine);
                 if (match.Success)
                 {
                     compressorEngine.LogFlags = LogFlags.None;
 
                     string modeStr = match.Groups?["mode"]?.Value;
-                    string[] modeArr = modeStr.Split(',');
+                    string[] modeArr = modeStr.Replace(" ", string.Empty).Split(',');
 
-                    foreach (string modeVal in modeArr)
+                    foreach (string modeVal in modeArr.Where(a => !string.IsNullOrEmpty(a)))
                     {
-                        LogFlags lm = LogFlags.General;
+                        LogFlags lm;
                         if (!Enum.TryParse<LogFlags>(modeVal, true, out lm))
                         {
                             Console.WriteLine($"Unrecognised log level value: {modeVal}");

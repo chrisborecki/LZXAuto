@@ -1,4 +1,11 @@
-﻿using System;
+﻿/*  
+ *  LZX compression helper for Windows 10
+ *  Copyright (c) 2019 Christopher Borecki
+ * 
+ *  MIT Licence
+ * 
+ * */
+using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
