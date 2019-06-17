@@ -34,7 +34,6 @@ namespace LZXCompactLightEngine
 
         private readonly object lockObject = new object();
         private readonly int maxQueueLength = Environment.ProcessorCount * 16;
-        private readonly BinaryFormatter binaryFormatter = new BinaryFormatter();
         private readonly CancellationTokenSource cancelToken = new CancellationTokenSource();
         private readonly string[] skipCompression = new string[] { ".zip", ".gif", ".7z", ".bmp", ".jpeg", ".jpg", ".mov", ".mp3", ".avi", ".cab", ".mpeg" };
 
@@ -284,17 +283,20 @@ namespace LZXCompactLightEngine
         {
             try
             {
-                Log("Saving file...", 1, LogFlags.Debug);
                 lock (lockObject)
                 {
+                    BinaryFormatter binaryFormatter = new BinaryFormatter();
                     using (FileStream writerFileStream = new FileStream(dbFileName, FileMode.Create, FileAccess.Write))
                     {
+                        Log("Saving file...", 1, LogFlags.Debug);
+
                         binaryFormatter.Serialize(writerFileStream, fileDict);
+
+                        Log($"File saved, dictCount: {fileDict.Count}, fileSize: {writerFileStream.Length}", 1, LogFlags.Debug);
+
                         writerFileStream.Close();
                     }
                 }
-
-                Log("File saved", 1, LogFlags.Debug);
             }
             catch (Exception ex)
             {
@@ -310,11 +312,12 @@ namespace LZXCompactLightEngine
                 {
                     Log("Dictionary file found");
 
+                    BinaryFormatter binaryFormatter = new BinaryFormatter();
                     using (FileStream readerFileStream = new FileStream(dbFileName, FileMode.Open, FileAccess.Read))
                     {
                         if (readerFileStream.Length > 0)
                         {
-                            fileDict = (ConcurrentDictionary<int, int>)this.binaryFormatter.Deserialize(readerFileStream);
+                            fileDict = (ConcurrentDictionary<int, int>)binaryFormatter.Deserialize(readerFileStream);
                             readerFileStream.Close();
                         }
                     }

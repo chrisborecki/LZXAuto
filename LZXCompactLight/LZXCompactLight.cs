@@ -32,6 +32,7 @@ namespace LZXCompactLight
                 return;
             }
 
+            AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
             Console.CancelKeyPress += new ConsoleCancelEventHandler(ConsoleTerminateHandler);
 
             string commandLine = string.Empty;
@@ -212,9 +213,14 @@ Version number: {Assembly.GetEntryAssembly().GetName().Version}
             compressorEngine.Process(commandLineRequestedPath);
         }
 
+        private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
+        {
+            //compressorEngine.Cancel();
+        }
+
         private static void ConsoleTerminateHandler(object sender, ConsoleCancelEventArgs args)
         {
-            args.Cancel = true;
+            args.Cancel = false;
             compressorEngine.Cancel();
         }
 
