@@ -49,8 +49,13 @@ namespace LZXCompactLightEngine
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < newLinePrefix; i++, sb.AppendLine()) ;
 
-            if (showTimeStamp && !string.IsNullOrEmpty(str))
-                sb.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " " + str);
+            if (!string.IsNullOrEmpty(str))
+            {
+                if (showTimeStamp)
+                    sb.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " ");
+
+                sb.Append(str);
+            }
 
             string result = sb.ToString();
 
