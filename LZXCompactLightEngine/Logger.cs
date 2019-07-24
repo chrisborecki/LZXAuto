@@ -39,7 +39,7 @@ namespace LZXCompactLightEngine
             Log($"Error during processing: file: {fi.FullName}, exception message: {ex.Message}");
         }
 
-        public void Log(string str, int newLinePrefix = 1, LogFlags level = LogFlags.General)
+        public void Log(string str, int newLinePrefix = 1, LogFlags level = LogFlags.General, bool showTimeStamp = true)
         {
             if (!LogFlags.HasFlag(level))
             {
@@ -49,7 +49,7 @@ namespace LZXCompactLightEngine
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < newLinePrefix; i++, sb.AppendLine()) ;
 
-            if (!string.IsNullOrEmpty(str))
+            if (showTimeStamp && !string.IsNullOrEmpty(str))
                 sb.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " " + str);
 
             string result = sb.ToString();

@@ -181,6 +181,9 @@ namespace LZXCompactLightEngine
                 long spaceSaved = Math.Max(0, uncompressedFilesTotalSize - DriveUtils.GetDriveUsedSpace(path));
                 long spaceSavedThisSession = Math.Max(0, diskFreeSpace1 - diskFreeSpace0);
 
+                StringBuilder statStr = new StringBuilder();
+
+            
                 Logger.Log(
                     $"Stats: {Environment.NewLine}" +
                     $"Files skipped by attributes: {fileCountSkippedByAttributes}{Environment.NewLine}" +
@@ -191,28 +194,26 @@ namespace LZXCompactLightEngine
                     $"Files in db: {fileDict?.Count ?? 0}{Environment.NewLine}" +
                     $"Drive capacity: {DriveUtils.GetMemoryString(DriveUtils.GetDriveCapacity(path))}{Environment.NewLine}" +
                     $"Approx space saved during this session: {DriveUtils.GetMemoryString(diskFreeSpace1 - diskFreeSpace0)}{Environment.NewLine}"
-                    , 2);
+                    , 2, LogFlags.General);
 
                 if (IsElevated)
                 {
                     Logger.Log(
-                        $"Files uncompressed on drive: {DriveUtils.GetMemoryString(uncompressedFilesTotalSize)}{Environment.NewLine}" +
+                        $"Files uncompressed on drive (beta): {DriveUtils.GetMemoryString(uncompressedFilesTotalSize)}{Environment.NewLine}" +
                         $"Drive capacity: {DriveUtils.GetMemoryString(DriveUtils.GetDriveCapacity(path))}{Environment.NewLine}" +
-                        $"Approx space saved on drive: {DriveUtils.GetMemoryString(spaceSaved)}{Environment.NewLine}"
-                        , 0);
+                        $"Approx space saved on drive (beta): {DriveUtils.GetMemoryString(spaceSaved)}{Environment.NewLine}",
+                        0, LogFlags.General, false);
                 }
                 else
                 {
-                    Logger.Log("Cannot show additional stats because process is not running with Administrator rights.", 0);
+                    Logger.Log("Cannot show additional stats because process is not running with Administrator rights.", 0, LogFlags.General, false);
                 }
-
-                Logger.Log(string.Empty, 2);
 
                 Logger.Log(
                     $"Perf stats:{Environment.NewLine}" +
                     $"Time elapsed[hh:mm:ss:ms]: {ts.Hours.ToString("00")}:{ts.Minutes.ToString("00")}:{ts.Seconds.ToString("00")}:{ts.Milliseconds.ToString("00")}{Environment.NewLine}" +
-                    $"Compressed files per minute: {((double)fileCountProcessed / (double)ts.TotalMinutes).ToString("0.00")}" +
-                    $"Files per minute: {((double)totalFilesVisited / (double)ts.TotalMinutes).ToString("0.00")}", 2);
+                    $"Compressed files per minute: {((double)fileCountProcessed / (double)ts.TotalMinutes).ToString("0.00")}{Environment.NewLine}" +
+                    $"Files per minute: {((double)totalFilesVisited / (double)ts.TotalMinutes).ToString("0.00")}", 2, LogFlags.General, false);
             }
         }
 
@@ -259,6 +260,7 @@ namespace LZXCompactLightEngine
                     proc.StartInfo.UseShellExecute = false;
                     proc.StartInfo.RedirectStandardOutput = true;
                     proc.Start();
+                    proc.PriorityClass = ProcessPriorityClass.BelowNormal;
                     string outPut = proc.StandardOutput.ReadToEnd();
                     proc.WaitForExit();
                     proc.Close();
