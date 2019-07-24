@@ -183,7 +183,6 @@ namespace LZXCompactLightEngine
 
                 StringBuilder statStr = new StringBuilder();
 
-            
                 Logger.Log(
                     $"Stats: {Environment.NewLine}" +
                     $"Files skipped by attributes: {fileCountSkippedByAttributes}{Environment.NewLine}" +
@@ -193,7 +192,7 @@ namespace LZXCompactLightEngine
                     $"Total files visited: {totalFilesVisited}{Environment.NewLine}" +
                     $"Files in db: {fileDict?.Count ?? 0}{Environment.NewLine}" +
                     $"Drive capacity: {DriveUtils.GetMemoryString(DriveUtils.GetDriveCapacity(path))}{Environment.NewLine}" +
-                    $"Approx space saved during this session: {DriveUtils.GetMemoryString(diskFreeSpace1 - diskFreeSpace0)}{Environment.NewLine}"
+                    $"Approx space saved during this session: {DriveUtils.GetMemoryString(spaceSavedThisSession)}{Environment.NewLine}"
                     , 2, LogFlags.General);
 
                 if (IsElevated)
