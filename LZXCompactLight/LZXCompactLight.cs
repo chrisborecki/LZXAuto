@@ -7,6 +7,7 @@
  * */
 
 using LZXCompactLightEngine;
+using Newtonsoft.Json;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -28,7 +29,7 @@ namespace LZXCompactLight
             string thisprocessname = Process.GetCurrentProcess().ProcessName;
             if (Process.GetProcesses().Count(p => p.ProcessName == thisprocessname) > 1)
             {
-                compressorEngine.Log("Another instance is already running. Exiting...", 2, LogFlags.General);
+                compressorEngine.Logger.Log("Another instance is already running. Exiting...", 2, LogFlags.General);
                 return;
             }
 
@@ -80,6 +81,8 @@ LZXCompactLight keeps record of file name and its last seen size. If the file ha
 This saves SSD write cycles and speeds up processing time.
 Iterating through files is multithreaded, one file per CPU logical core.
 
+For better results, this command should be run with Adminstrator priviledges.
+
 Typical use:
 LZXCompactLight /scheduleOn c:\ 
 
@@ -96,7 +99,7 @@ Version number: {Assembly.GetEntryAssembly().GetName().Version}
                 return;
             }
 
-            compressorEngine.LogFlags = LogFlags.General | LogFlags.Stat;
+            compressorEngine.Logger.LogFlags = LogFlags.General | LogFlags.Stat;
 
 
             // Parse log level option, like: /q:general, stat, fileskipping
@@ -106,7 +109,7 @@ Version number: {Assembly.GetEntryAssembly().GetName().Version}
                 var match = rx.Match(commandLine);
                 if (match.Success)
                 {
-                    compressorEngine.LogFlags = LogFlags.None;
+                    compressorEngine.Logger.LogFlags = LogFlags.None;
 
                     string modeStr = match.Groups?["mode"]?.Value;
                     string[] modeArr = modeStr.Replace(" ", string.Empty).Split(',');
@@ -120,13 +123,13 @@ Version number: {Assembly.GetEntryAssembly().GetName().Version}
                             return;
                         }
 
-                        compressorEngine.LogFlags |= lm;
+                        compressorEngine.Logger.LogFlags |= lm;
                     }
                 }
             }
 
             // Parse path option
-            string commandLineRequestedPath = @"c:\";
+            string commandLineRequestedPath = Path.GetPathRoot(System.Reflection.Assembly.GetEntryAssembly().Location);
             foreach (string arg in args)
             {
                 Regex rx = new Regex(@"[a-z]:\\", RegexOptions.IgnoreCase);
@@ -210,7 +213,21 @@ Version number: {Assembly.GetEntryAssembly().GetName().Version}
                 return;
             }
 
-            compressorEngine.Process(commandLineRequestedPath);
+            string[] skipFileExtensions;
+            try
+            {
+                // Read config file
+                var file = File.ReadAllText(@"LZXCompactLightConfig.json");
+                dynamic j = JsonConvert.DeserializeObject(file);
+                skipFileExtensions = j.skipFileExtensions.ToObject<string[]>();
+            }
+            catch(Exception ex)
+            {
+                compressorEngine.Logger.Log(ex, "Could not parse LZXCompactLightConfig.json");
+                return;
+            }
+
+            compressorEngine.Process(commandLineRequestedPath, skipFileExtensions);
         }
 
         private static void CurrentDomain_ProcessExit(object sender, EventArgs e)

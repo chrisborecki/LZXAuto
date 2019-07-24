@@ -11,7 +11,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Security.Principal;
 using System.Text;
 using System.Threading;
 
@@ -19,45 +21,55 @@ namespace LZXCompactLightEngine
 {
     public class LZXCompactLightEngine
     {
-        private const int treadPoolWaitMs = 200;
-        private const int fileSaveTimerMs = (int)30e3; //30 seconds
-        private const string dbFileName = "FileDict.db";
-        private const string logFileName = "Activity.log";
-
-        private Timer timer;
-        private int threadQueueLength;
-        private int fileCountProcessed = 0;
-        private int fileCountSkipByNoChanges = 0;
-        private int fileCountSkippedByExtension = 0;
-        private int fileCountSkippedByAttributes = 0;
         private ConcurrentDictionary<int, int> fileDict = new ConcurrentDictionary<int, int>();
 
-        private readonly object lockObject = new object();
-        private readonly int maxQueueLength = Environment.ProcessorCount * 16;
-        private readonly CancellationTokenSource cancelToken = new CancellationTokenSource();
-        private readonly string[] skipCompression = new string[] { ".zip", ".gif", ".7z", ".bmp", ".jpeg", ".jpg", ".mov", ".mp3", ".avi", ".cab", ".mpeg" };
+        private const int fileSaveTimerMs = (int)30e3; //30 seconds
+        private const int treadPoolWaitMs = 200;
+        private const string dbFileName = "FileDict.db";
 
-        public LogFlags LogFlags { get; set; } = LogFlags.General;
+        private int fileCountProcessed = 0;
+        private int fileCountSkipByNoChanges = 0;
+        private int fileCountSkippedByAttributes = 0;
+        private int fileCountSkippedByExtension = 0;
+        private int threadQueueLength;
+
+        private string[] skipFileExtensions;
+
+        private long diskFreeSpace0, diskFreeSpace1, uncompressedFilesTotalSize;
+
+        private readonly CancellationTokenSource cancelToken = new CancellationTokenSource();
+        private readonly int maxQueueLength = Environment.ProcessorCount * 16;
+        private readonly object lockObject = new object();
+        private readonly Timer timer;
+
+        public  Logger Logger { get; set; } = new Logger(LogFlags.General);
+
+        public bool IsElevated
+        {
+            get
+            {
+                using (WindowsIdentity identity = WindowsIdentity.GetCurrent())
+                {
+                    WindowsPrincipal principal = new WindowsPrincipal(identity);
+                    return principal.IsInRole(WindowsBuiltInRole.Administrator);
+                }
+            }
+        }
 
         public LZXCompactLightEngine()
         {
             timer = new Timer(FileSaveTimerCallback, null, fileSaveTimerMs, fileSaveTimerMs);
         }
-        public void ResetDb()
-        {
-            File.Delete(dbFileName);
-        }
 
-        public void Cancel()
+        public void Process(string path, string[] skipFileExtensionsArr)
         {
-            Log("Terminating...", 4, LogFlags.General);
-            cancelToken.Cancel();
-        }
-    
-        public void Process(string path = "c:\\")
-        {
-            Log($"Starting new compressing session. LZXCompactLight version: {Assembly.GetEntryAssembly().GetName().Version}", 20);
-            Log($"Starting path {path}", 2);
+            skipFileExtensions = skipFileExtensionsArr ?? new string[] { };
+
+            Logger.Log($"Starting new compressing session. LZXCompactLight version: {Assembly.GetEntryAssembly().GetName().Version}", 20);
+            Logger.Log($"Running in Administrator mode: {IsElevated}", 2);
+            Logger.Log($"Starting path {path}", 2);
+
+            diskFreeSpace0 = DriveUtils.GetDriveFreeSpace(path);
 
             DateTime startTimeStamp = DateTime.Now;
 
@@ -65,7 +77,7 @@ namespace LZXCompactLightEngine
             {
                 DirectoryInfo dirTop = new DirectoryInfo(path);
 
-                LoadFromFile();
+                LoadDictFromFile();
 
                 foreach (var fi in dirTop.EnumerateFiles())
                 {
@@ -93,7 +105,7 @@ namespace LZXCompactLightEngine
                     }
                     catch (UnauthorizedAccessException UnAuthTop)
                     {
-                        Log(fi, UnAuthTop);
+                        Logger.Log(fi, UnAuthTop);
                     }
                 }
 
@@ -127,101 +139,80 @@ namespace LZXCompactLightEngine
                             }
                             catch (UnauthorizedAccessException UnAuthFile)
                             {
-                                Log(fi, UnAuthFile);
+                                Logger.Log(fi, UnAuthFile);
                             }
                         }
                     }
                     catch (UnauthorizedAccessException UnAuthSubDir)
                     {
-                        Log($"UnAuthSubDir: {UnAuthSubDir.Message}");
+                        Logger.Log($"UnAuthSubDir: {UnAuthSubDir.Message}");
                     }
                 }
             }
             catch (DirectoryNotFoundException DirNotFound)
             {
-                Log(DirNotFound.Message);
+                Logger.Log(DirNotFound.Message);
             }
             catch (UnauthorizedAccessException UnAuthDir)
             {
-                Log($"UnAuthDir: {UnAuthDir.Message}");
+                Logger.Log($"UnAuthDir: {UnAuthDir.Message}");
             }
             catch (PathTooLongException LongPath)
             {
-                Log(LongPath.Message);
+                Logger.Log(LongPath.Message);
             }
             catch (Exception ex)
             {
-                Log($"Other error: {ex.Message}");
+                Logger.Log($"Other error: {ex.Message}");
             }
             finally
             {
                 // Wait until all threads complete
                 FinalizeThreadPool();
 
-                Log("Completed");
+                Logger.Log("Completed");
 
-                SaveToFile();
+                SaveDictToFile();
 
                 TimeSpan ts = DateTime.Now.Subtract(startTimeStamp);
                 int totalFilesVisited = fileCountProcessed + fileCountSkipByNoChanges + fileCountSkippedByAttributes + fileCountSkippedByExtension;
 
-                Log(
+                diskFreeSpace1 = DriveUtils.GetDriveFreeSpace(path);
+                long spaceSaved = Math.Max(0, uncompressedFilesTotalSize - DriveUtils.GetDriveUsedSpace(path));
+                long spaceSavedThisSession = Math.Max(0, diskFreeSpace1 - diskFreeSpace0);
+
+                Logger.Log(
                     $"Stats: {Environment.NewLine}" +
                     $"Files skipped by attributes: {fileCountSkippedByAttributes}{Environment.NewLine}" +
                     $"Files skipped by extension: { fileCountSkippedByExtension}{Environment.NewLine}" +
                     $"Files skipped by no change: { fileCountSkipByNoChanges}{Environment.NewLine}" +
                     $"Files processed by compact command line: { fileCountProcessed}{Environment.NewLine}" +
                     $"Total files visited: {totalFilesVisited}{Environment.NewLine}" +
-                    $"Files in db: {fileDict?.Count ?? 0}", 2);
+                    $"Files in db: {fileDict?.Count ?? 0}{Environment.NewLine}" +
+                    $"Drive capacity: {DriveUtils.GetMemoryString(DriveUtils.GetDriveCapacity(path))}{Environment.NewLine}" +
+                    $"Approx space saved during this session: {DriveUtils.GetMemoryString(diskFreeSpace1 - diskFreeSpace0)}{Environment.NewLine}"
+                    , 2);
 
-                Log(
+                if (IsElevated)
+                {
+                    Logger.Log(
+                        $"Files uncompressed on drive: {DriveUtils.GetMemoryString(uncompressedFilesTotalSize)}{Environment.NewLine}" +
+                        $"Drive capacity: {DriveUtils.GetMemoryString(DriveUtils.GetDriveCapacity(path))}{Environment.NewLine}" +
+                        $"Approx space saved on drive: {DriveUtils.GetMemoryString(spaceSaved)}{Environment.NewLine}"
+                        , 0);
+                }
+                else
+                {
+                    Logger.Log("Cannot show additional stats because process is not running with Administrator rights.", 0);
+                }
+
+                Logger.Log(string.Empty, 2);
+
+                Logger.Log(
                     $"Perf stats:{Environment.NewLine}" +
                     $"Time elapsed[hh:mm:ss:ms]: {ts.Hours.ToString("00")}:{ts.Minutes.ToString("00")}:{ts.Seconds.ToString("00")}:{ts.Milliseconds.ToString("00")}{Environment.NewLine}" +
+                    $"Compressed files per minute: {((double)fileCountProcessed / (double)ts.TotalMinutes).ToString("0.00")}" +
                     $"Files per minute: {((double)totalFilesVisited / (double)ts.TotalMinutes).ToString("0.00")}", 2);
-            }
-        }
-
-        public void Log(FileInfo fi, Exception ex)
-        {
-            Log($"Error during processing: file: {fi.FullName}, exception message: {ex.Message}");
-        }
-
-        public void Log(string str, int newLinePrefix = 1, LogFlags level = LogFlags.General)
-        {
-            if (!LogFlags.HasFlag(level))
-            {
-                return;
-            }
-
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < newLinePrefix; i++, sb.AppendLine());
-
-            if (!string.IsNullOrEmpty(str))
-                sb.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " " + str);
-
-            string result = sb.ToString();
-
-            if (LogFlags.HasFlag(LogFlags.General) && level.HasFlag(LogFlags.General) ||
-                LogFlags.HasFlag(LogFlags.Stat) && level.HasFlag(LogFlags.Stat))
-            {
-                Console.WriteLine(result);
-            }
-
-            lock (lockObject)
-            {
-                File.AppendAllText(logFileName, result);
-            }
-        }
-
-        private void FinalizeThreadPool()
-        {
-            // Disable file save timer callback
-            timer.Change(Timeout.Infinite, Timeout.Infinite);
-
-            // Wait for thread pool to complete
-            while (threadQueueLength > 0)
-            {
-                Thread.Sleep(treadPoolWaitMs);
             }
         }
 
@@ -229,7 +220,9 @@ namespace LZXCompactLightEngine
         {
             try
             {
-                if (skipCompression.Any(c => c == fi.Extension))
+                Interlocked.Add(ref uncompressedFilesTotalSize, DriveUtils.GetDiskUncompressedFileSize(fi.Length, fi.FullName));
+
+                if (skipFileExtensions.Any(c => c == fi.Extension))
                 {
                     Interlocked.Increment(ref fileCountSkippedByExtension);
                     return;
@@ -243,21 +236,21 @@ namespace LZXCompactLightEngine
 
                 if (fi.Length > 0)
                 {
-                    Log("", 4, LogFlags.FileCompacting | LogFlags.FileSkipping);
+                    Logger.Log("", 4, LogFlags.FileCompacting | LogFlags.FileSkipping);
 
                     int filePathHash = fi.FullName.GetHashCode();
 
                     int fileSizeHash;
                     if (fileDict.TryGetValue(filePathHash, out fileSizeHash) && fileSizeHash == fi.Length.GetHashCode())
                     {
-                        Log($"Skipping file: ${fi.FullName} because it has been visited already and its size did not change", 1, LogFlags.FileSkipping);
+                        Logger.Log($"Skipping file: ${fi.FullName} because it has been visited already and its size did not change", 1, LogFlags.FileSkipping);
                         Interlocked.Increment(ref fileCountSkipByNoChanges);
                         return;
                     }
 
                     fileDict[filePathHash] = fi.Length.GetHashCode();
 
-                    Log($"Compressing file {fi.FullName}", 1, LogFlags.FileCompacting);
+                    Logger.Log($"Compressing file {fi.FullName}", 1, LogFlags.FileCompacting);
                     Interlocked.Increment(ref fileCountProcessed);
 
                     var proc = new Process();
@@ -270,7 +263,7 @@ namespace LZXCompactLightEngine
                     proc.WaitForExit();
                     proc.Close();
 
-                    Log(outPut, 2, LogFlags.Debug);
+                    Logger.Log(outPut, 2, LogFlags.Debug);
                 }
             }
             finally
@@ -279,7 +272,12 @@ namespace LZXCompactLightEngine
             }
         }
 
-        private void SaveToFile()
+        public void ResetDb()
+        {
+            File.Delete(dbFileName);
+        }
+
+        private void SaveDictToFile()
         {
             try
             {
@@ -288,11 +286,11 @@ namespace LZXCompactLightEngine
                     BinaryFormatter binaryFormatter = new BinaryFormatter();
                     using (FileStream writerFileStream = new FileStream(dbFileName, FileMode.Create, FileAccess.Write))
                     {
-                        Log("Saving file...", 1, LogFlags.Debug);
+                        Logger.Log("Saving file...", 1, LogFlags.Debug);
 
                         binaryFormatter.Serialize(writerFileStream, fileDict);
 
-                        Log($"File saved, dictCount: {fileDict.Count}, fileSize: {writerFileStream.Length}", 1, LogFlags.Debug);
+                        Logger.Log($"File saved, dictCount: {fileDict.Count}, fileSize: {writerFileStream.Length}", 1, LogFlags.Debug);
 
                         writerFileStream.Close();
                     }
@@ -300,17 +298,17 @@ namespace LZXCompactLightEngine
             }
             catch (Exception ex)
             {
-                Log($"Unable to save dic to file, {ex.Message}");
+                Logger.Log($"Unable to save dic to file, {ex.Message}");
             }
         }
 
-        private void LoadFromFile()
+        private void LoadDictFromFile()
         {
             if (File.Exists(dbFileName))
             {
                 try
                 {
-                    Log("Dictionary file found");
+                    Logger.Log("Dictionary file found");
 
                     BinaryFormatter binaryFormatter = new BinaryFormatter();
                     using (FileStream readerFileStream = new FileStream(dbFileName, FileMode.Open, FileAccess.Read))
@@ -322,11 +320,11 @@ namespace LZXCompactLightEngine
                         }
                     }
 
-                    Log("Loaded from file");
+                    Logger.Log("Loaded from file");
                 }
                 catch (Exception ex)
                 {
-                    Log($"Error during loading from file: {ex.Message}" +
+                    Logger.Log($"Error during loading from file: {ex.Message}" +
                         $"{Environment.NewLine}Terminating.");
 
                     Environment.Exit(-1);
@@ -334,25 +332,34 @@ namespace LZXCompactLightEngine
             }
             else
             {
-                Log("DB file not found");
+                Logger.Log("DB file not found");
             }
         }
 
         private void FileSaveTimerCallback(object state)
         {
-            Log("Saving dictionary file...", 1, LogFlags.Debug);
-            SaveToFile();
+            Logger.Log("Saving dictionary file...", 1, LogFlags.Debug);
+            SaveDictToFile();
+        }
+
+        public void Cancel()
+        {
+            Logger.Log("Terminating...", 4, LogFlags.General);
+            cancelToken.Cancel();
+        }
+
+        private void FinalizeThreadPool()
+        {
+            // Disable file save timer callback
+            timer.Change(Timeout.Infinite, Timeout.Infinite);
+
+            // Wait for thread pool to complete
+            while (threadQueueLength > 0)
+            {
+                Thread.Sleep(treadPoolWaitMs);
+            }
         }
     }
 
-    [Flags]
-    public enum LogFlags
-    {
-        None = 0,
-        General = 1,
-        Stat = 2,
-        FileCompacting = 4,
-        FileSkipping = 8,
-        Debug = 16
-    }
+
 }
