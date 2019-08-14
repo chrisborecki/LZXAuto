@@ -23,7 +23,7 @@ namespace LZXCompactLightEngine
     {
         private ConcurrentDictionary<int, int> fileDict = new ConcurrentDictionary<int, int>();
 
-        private const int fileSaveTimerMs = (int)30e3; //30 seconds
+        //private const int fileSaveTimerMs = (int)30e3; //30 seconds
         private const int treadPoolWaitMs = 200;
         private const string dbFileName = "FileDict.db";
 
@@ -40,7 +40,7 @@ namespace LZXCompactLightEngine
         private readonly CancellationTokenSource cancelToken = new CancellationTokenSource();
         private readonly int maxQueueLength = Environment.ProcessorCount * 16;
         private readonly object lockObject = new object();
-        private readonly Timer timer;
+        //private readonly Timer timer;
 
         public  Logger Logger { get; set; } = new Logger(LogFlags.General);
 
@@ -58,7 +58,7 @@ namespace LZXCompactLightEngine
 
         public LZXCompactLightEngine()
         {
-            timer = new Timer(FileSaveTimerCallback, null, fileSaveTimerMs, fileSaveTimerMs);
+            //timer = new Timer(FileSaveTimerCallback, null, fileSaveTimerMs, fileSaveTimerMs);
         }
 
         public void Process(string path, string[] skipFileExtensionsArr)
@@ -337,11 +337,11 @@ namespace LZXCompactLightEngine
             }
         }
 
-        private void FileSaveTimerCallback(object state)
-        {
-            Logger.Log("Saving dictionary file...", 1, LogFlags.Debug);
-            SaveDictToFile();
-        }
+        //private void FileSaveTimerCallback(object state)
+        //{
+        //    Logger.Log("Saving dictionary file...", 1, LogFlags.Debug);
+        //    SaveDictToFile();
+        //}
 
         public void Cancel()
         {
@@ -352,7 +352,7 @@ namespace LZXCompactLightEngine
         private void FinalizeThreadPool()
         {
             // Disable file save timer callback
-            timer.Change(Timeout.Infinite, Timeout.Infinite);
+            //timer.Change(Timeout.Infinite, Timeout.Infinite);
 
             // Wait for thread pool to complete
             while (threadQueueLength > 0)

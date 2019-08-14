@@ -51,16 +51,16 @@ namespace LZXCompactLightEngine
 
         public static string GetMemoryString(double bytes)
         {
-            int counter = 0;
+            int index = 0;
             double value = bytes;
             string text;
             do
             {
-                text = value.ToString("0.0") + " " + BinaryPrefix[counter];
+                text = value.ToString("0.0") + " " + BinaryPrefix[index];
                 value /= 1024;
-                counter++;
+                index++;
             }
-            while (Math.Floor(value) > 0 && counter < BinaryPrefix.Length);
+            while (Math.Floor(value) > 0 && index < BinaryPrefix.Length);
             return text;
         }
     }
