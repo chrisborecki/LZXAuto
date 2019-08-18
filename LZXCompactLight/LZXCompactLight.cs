@@ -29,7 +29,7 @@ namespace LZXCompactLight
             string thisprocessname = Process.GetCurrentProcess().ProcessName;
             if (Process.GetProcesses().Count(p => p.ProcessName == thisprocessname) > 1)
             {
-                compressorEngine.Logger.Log("Another instance is already running. Exiting...", 2, LogFlags.General);
+                compressorEngine.Logger.Log("Another instance is already running. Exiting...", 2, LogLevel.General);
                 return;
             }
 
@@ -46,15 +46,17 @@ namespace LZXCompactLight
             if (args.Length == 0 || args.Contains("/?") || args.Contains("/help"))
             {
                 Console.WriteLine($@"
-Compress files to NTFS LZX compression with minimal disk write cycles.
+Automatically compress files to NTFS LZX compression with minimal disk write cycles.
                 
 Syntax: LZXCompactLight [/log:mode] [/resetDb] [/scheduleOn] [/scheduleOff] [/? | /help] [filePath]
 
 Options:
 
-/log: None, General, Stat, FileCompacing, FileSkipping, Debug - log flags (comma separated list).
-General and Stat levels are outputed to both log file and the console, other levels to log file only.
-Default value: /log:General, Stat
+/log: [None, General, Info, Debug] - log level. Default value: Info
+None    - nothing is outputted
+General - Session start / end timestamp, skipped folders
+Info    - General + statistics about current session
+Debug   - Info + information about every file
 
 /resetDb - resets db. On next run, all files will be traversed by Compact command.
 
@@ -69,19 +71,22 @@ filePath - root path to start. All subdirectories will be traversed. Default is 
 Description:
 Windows 10 extended NTFS compression with LZX alghorithm. 
 Files compressed with LZX can be opened like any other file because the uncompressing operation is transparent.
-Compressing files with LZX is CPU intensive and thus is not being done automatically. It can be done only by running Compact command line.
+Compressing files with LZX is CPU intensive and thus is not being done automatically. When file is updated, it will be saved in uncompressed state.
 To keep the files compressed, windows Compact command needs to be re-run. This can be done with Task Scheduler.
 
 There is a catch with SSD drives though.
 When Compact command is being run on file already LZX-compressed, it will not try to recompress it.
-However, if file is not compressible, Compact will try to recompress it every time, writing temp data to disk.
+However, if file is not compressible (like .jpg image), Compact will try to recompress it every time, writing temp data to disk.
 
 This is an issue on SSD drives, because of limited write cycles.
-LZXCompactLight keeps record of file name and its last seen size. If the file has not changed since last LZXCompactLight run, attempt for recomressing will not be made. 
-This saves SSD write cycles and speeds up processing time.
-Iterating through files is multithreaded, one file per CPU logical core.
+LZXCompactLight keeps record of file name and its last seen size. If the file has not changed since last LZXCompactLight run, it will be skipped. 
+This saves SSD write cycles and also speeds up processing time, as on second run only newly updated / inserted files are processed.
 
-For better results, this command should be run with Adminstrator priviledges.
+If folder is found with NTFS compression enabled, after processing it will be marked as non-compressed. 
+This is because LZX-compression does not use NTFS Compressed attribute.
+
+Iterating through files is multithreaded, one file per CPU logical core.
+For larger file accessibility, this command should be run with Adminstrator priviledges.
 
 Typical use:
 LZXCompactLight /scheduleOn c:\ 
@@ -99,31 +104,30 @@ Version number: {Assembly.GetEntryAssembly().GetName().Version}
                 return;
             }
 
-            compressorEngine.Logger.LogFlags = LogFlags.General | LogFlags.Stat;
+            compressorEngine.Logger.LogLevel = LogLevel.Info;
 
 
-            // Parse log level option, like: /q:general, stat, fileskipping
+            // Parse log level option, like: /q:general
             if (!string.IsNullOrEmpty(commandLine))
             {
                 Regex rx = new Regex(@"/log:(?<mode>(\s*\w+\s*[,]{0,1})*)(?![:/])", RegexOptions.IgnoreCase);
                 var match = rx.Match(commandLine);
                 if (match.Success)
                 {
-                    compressorEngine.Logger.LogFlags = LogFlags.None;
+                    compressorEngine.Logger.LogLevel = LogLevel.None;
 
                     string modeStr = match.Groups?["mode"]?.Value;
                     string[] modeArr = modeStr.Replace(" ", string.Empty).Split(',');
 
                     foreach (string modeVal in modeArr.Where(a => !string.IsNullOrEmpty(a)))
                     {
-                        LogFlags lm;
-                        if (!Enum.TryParse<LogFlags>(modeVal, true, out lm))
+                        if (!Enum.TryParse<LogLevel>(modeVal, true, out LogLevel logL))
                         {
                             Console.WriteLine($"Unrecognised log level value: {modeVal}");
                             return;
                         }
 
-                        compressorEngine.Logger.LogFlags |= lm;
+                        compressorEngine.Logger.LogLevel = logL;
                     }
                 }
             }

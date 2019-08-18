@@ -12,26 +12,20 @@ namespace LZXCompactLightEngine
         private const string logFileName = "Activity.log";
         private readonly object lockObject = new object();
 
-        public LogFlags LogFlags { get; set; }
+        public LogLevel LogLevel { get; set; }
 
-        public Logger(LogFlags logFlags)
+        public Logger(LogLevel logLevel)
         {
-            LogFlags = logFlags;
+            LogLevel = logLevel;
         }
 
         public void Log(Exception ex, string customMessage)
         {
+            if (LogLevel == LogLevel.None)
+                return;
+
             Log($"Error encountered: {customMessage}.");
-
-            if (!string.IsNullOrEmpty(customMessage))
-            {
-                Log(customMessage);
-            }
-
-            if (LogFlags.HasFlag(LogFlags.Debug))
-            {
-                Log($"Stack trace: {ex.StackTrace}");
-            }
+            Log($"Stack trace: {ex.StackTrace}");
         }
 
         public void Log(FileInfo fi, Exception ex)
@@ -39,9 +33,9 @@ namespace LZXCompactLightEngine
             Log($"Error during processing: file: {fi.FullName}, exception message: {ex.Message}");
         }
 
-        public void Log(string str, int newLinePrefix = 1, LogFlags level = LogFlags.General, bool showTimeStamp = true)
+        public void Log(string str, int newLinePrefix = 1, LogLevel level = LogLevel.Info, bool showTimeStamp = true)
         {
-            if (!LogFlags.HasFlag(level))
+            if (((int)LogLevel < (int)level))
             {
                 return;
             }
@@ -58,12 +52,7 @@ namespace LZXCompactLightEngine
             }
 
             string result = sb.ToString();
-
-            if (LogFlags.HasFlag(LogFlags.General) && level.HasFlag(LogFlags.General) ||
-                LogFlags.HasFlag(LogFlags.Stat) && level.HasFlag(LogFlags.Stat))
-            {
-                Console.WriteLine(result);
-            }
+            Console.WriteLine(result);
 
             lock (lockObject)
             {
@@ -72,14 +61,13 @@ namespace LZXCompactLightEngine
         }
     }
 
-    [Flags]
-    public enum LogFlags
+
+    public enum LogLevel
     {
         None = 0,
         General = 1,
-        Stat = 2,
-        FileCompacting = 4,
-        FileSkipping = 8,
-        Debug = 16
+        Info = 2,
+        Debug = 4,
+        Trace = 8
     }
 }

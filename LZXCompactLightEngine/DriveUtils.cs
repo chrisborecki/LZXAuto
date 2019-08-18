@@ -49,7 +49,7 @@ namespace LZXCompactLightEngine
             return (long)(clustersize * (((ulong)logicalFileSize + clustersize - 1) / clustersize));
         }
 
-        public static string GetMemoryString(double bytes)
+        public static string GetMemoryString(this long bytes)
         {
             int index = 0;
             double value = bytes;
