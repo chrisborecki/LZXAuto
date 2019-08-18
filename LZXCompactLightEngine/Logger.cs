@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -19,18 +20,36 @@ namespace LZXCompactLightEngine
             LogLevel = logLevel;
         }
 
-        public void Log(Exception ex, string customMessage)
-        {
-            if (LogLevel == LogLevel.None)
-                return;
+        public string TimeStamp => DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " ";
 
-            Log($"Error encountered: {customMessage}.");
-            Log($"Stack trace: {ex.StackTrace}");
+        public void Log(Exception ex)
+        {
+            Log($"Exception details: {ex.ToString()}", 3);
         }
 
-        public void Log(FileInfo fi, Exception ex)
+        public void Log(Exception ex, DirectoryInfo di)
         {
-            Log($"Error during processing: file: {fi.FullName}, exception message: {ex.Message}");
+            Log($"Error while processing directory: {di.ToString()}, {ex.ToString()}", 3);
+        }
+
+        public void Log(SecurityException ex, DirectoryInfo di)
+        {
+            Log($"Cannot access directory: {di.ToString()}, {ex.ToString()}", 3);
+        }
+
+        public void Log(Exception ex, string customMessage)
+        {
+            Log($"Error message: {customMessage}.{Environment.NewLine}Exception details: {ex.ToString()}", 3);
+        }
+
+        public void Log(Exception ex, FileInfo fi)
+        {
+            Log($"Error during processing: file: {fi.FullName}.{Environment.NewLine}Exception details: {ex.ToString()}", 3);
+        }
+
+        public void Log(UnauthorizedAccessException ex, FileInfo fi)
+        {
+            Log($"Cannot access file: {fi.FullName}", 3);
         }
 
         public void Log(string str, int newLinePrefix = 1, LogLevel level = LogLevel.Info, bool showTimeStamp = true)
@@ -46,7 +65,7 @@ namespace LZXCompactLightEngine
             if (!string.IsNullOrEmpty(str))
             {
                 if (showTimeStamp)
-                    sb.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " ");
+                    sb.Append(TimeStamp);
 
                 sb.Append(str);
             }
@@ -67,7 +86,7 @@ namespace LZXCompactLightEngine
         None = 0,
         General = 1,
         Info = 2,
-        Debug = 4,
-        Trace = 8
+        Debug = 3,
+        Trace = 4
     }
 }

@@ -78,7 +78,6 @@ namespace LZXCompactLightEngine
                 LoadDictFromFile();
 
                 DirectoryInfo dirTop = new DirectoryInfo(path);
-                
 
                 foreach (var fi in dirTop.EnumerateFiles())
                 {
@@ -91,12 +90,12 @@ namespace LZXCompactLightEngine
 
                     try
                     {
+                        Interlocked.Increment(ref threadQueueLength);
+
                         ThreadPool.QueueUserWorkItem(a =>
                         {
                             ProcessFile(fi);
                         });
-
-                        Interlocked.Increment(ref threadQueueLength);
 
                         // Do not let queue length more items than MaxQueueLength
                         while (threadQueueLength > maxQueueLength)
@@ -104,9 +103,9 @@ namespace LZXCompactLightEngine
                             Thread.Sleep(treadPoolWaitMs);
                         }
                     }
-                    catch (UnauthorizedAccessException UnAuthTop)
+                    catch (Exception ex)
                     {
-                        Logger.Log(fi, UnAuthTop);
+                        Logger.Log(ex, fi);
                     }
                 }
 
@@ -125,12 +124,13 @@ namespace LZXCompactLightEngine
 
                             try
                             {
+                                Interlocked.Increment(ref threadQueueLength);
+
                                 ThreadPool.QueueUserWorkItem(a =>
                                 {
                                     ProcessFile(fi);
                                 });
 
-                                Interlocked.Increment(ref threadQueueLength);
 
                                 // Do not let queue length more items than MaxQueueLength
                                 while (threadQueueLength > maxQueueLength)
@@ -138,17 +138,17 @@ namespace LZXCompactLightEngine
                                     Thread.Sleep(treadPoolWaitMs);
                                 }
                             }
-                            catch (UnauthorizedAccessException UnAuthFile)
+                            catch (Exception ex)
                             {
-                                Logger.Log(fi, UnAuthFile);
+                                Logger.Log(ex, fi);
                             }
                         }
 
                         DirectoryRemoveCompressAttr(di);
                     }
-                    catch (UnauthorizedAccessException UnAuthSubDir)
+                    catch (Exception ex)
                     {
-                        Logger.Log($"UnAuthSubDir: {UnAuthSubDir.Message}");
+                        Logger.Log(ex, di);
                     }
                 }
 
@@ -271,6 +271,10 @@ namespace LZXCompactLightEngine
                     Logger.Log(outPut, 2, LogLevel.Debug);
                 }
             }
+            catch(Exception ex)
+            {
+                Logger.Log(ex, fi);
+            }
             finally
             {
                 Interlocked.Decrement(ref threadQueueLength);
@@ -279,11 +283,14 @@ namespace LZXCompactLightEngine
 
         private void DirectoryRemoveCompressAttr(DirectoryInfo dirTop)
         {
-            Logger.Log($"Removing NTFS compress flag on folder {dirTop.FullName} in favor of LZX compression", 1, LogLevel.General);
+            if (dirTop.Attributes.HasFlag(FileAttributes.Compressed))
+            {
+                Logger.Log($"Removing NTFS compress flag on folder {dirTop.FullName} in favor of LZX compression", 1, LogLevel.General);
 
-            string outPut = CompactCommand($"/u \"{dirTop.FullName}\"");
+                string outPut = CompactCommand($"/u \"{dirTop.FullName}\"");
 
-            Logger.Log(outPut, 2, LogLevel.Debug);
+                Logger.Log(outPut, 2, LogLevel.Debug);
+            }
         }
 
         private string CompactCommand(string arguments)
@@ -293,8 +300,19 @@ namespace LZXCompactLightEngine
             proc.StartInfo.Arguments = arguments;
             proc.StartInfo.UseShellExecute = false;
             proc.StartInfo.RedirectStandardOutput = true;
+
+            Logger.Log(arguments, 1, LogLevel.Debug, true);
+
             proc.Start();
-            proc.PriorityClass = ProcessPriorityClass.BelowNormal;
+            try
+            {
+                proc.PriorityClass = ProcessPriorityClass.BelowNormal;
+            }
+            catch (InvalidOperationException)
+            {
+                Logger.Log("Process Compact exited before setting its pririty. Nothing to worry about.", 3, LogLevel.Debug);
+            }
+
             string outPut = proc.StandardOutput.ReadToEnd();
             proc.WaitForExit();
             proc.Close();
@@ -374,7 +392,7 @@ namespace LZXCompactLightEngine
 
         public void Cancel()
         {
-            Logger.Log("Terminating...", 4, LogLevel.General);
+            Logger.Log("Terminating...", 3, LogLevel.General);
             cancelToken.Cancel();
         }
 
