@@ -227,7 +227,7 @@ namespace LZXCompactLightEngine
         {
             try
             {
-                Interlocked.Add(ref uncompressedFilesTotalSize, DriveUtils.GetDiskUncompressedFileSize(fi.Length, fi.FullName));
+                Interlocked.Add(ref uncompressedFilesTotalSize, fi.Length); // DriveUtils.GetDiskUncompressedFileSize(fi.Length, fi.FullName));
 
                 if (skipFileExtensions.Any(c => c == fi.Extension))
                 {
@@ -306,7 +306,7 @@ namespace LZXCompactLightEngine
             proc.Start();
             try
             {
-                proc.PriorityClass = ProcessPriorityClass.BelowNormal;
+                proc.PriorityClass = ProcessPriorityClass.Idle;
             }
             catch (InvalidOperationException)
             {

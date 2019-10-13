@@ -29,7 +29,7 @@ namespace LZXCompactLightEngine
 
         public void Log(Exception ex, DirectoryInfo di)
         {
-            Log($"Error while processing directory: {di.ToString()}, {ex.ToString()}", 3);
+            Log($"Error while processing directory: {di.FullName}, {ex.ToString()}", 3);
         }
 
         public void Log(SecurityException ex, DirectoryInfo di)
