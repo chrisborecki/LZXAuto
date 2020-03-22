@@ -21,7 +21,7 @@ namespace LZXCompactLightEngine
 {
     public class LZXCompactLightEngine
     {
-        private ConcurrentDictionary<int, int> fileDict = new ConcurrentDictionary<int, int>();
+        private ConcurrentDictionary<int, uint> fileDict = new ConcurrentDictionary<int, uint>();
 
         //private const int fileSaveTimerMs = (int)30e3; //30 seconds
         private const int treadPoolWaitMs = 200;
@@ -253,15 +253,16 @@ namespace LZXCompactLightEngine
                     Logger.Log("", 4, LogLevel.Debug);
 
                     int filePathHash = fi.FullName.GetHashCode();
+                    uint actualFileSize = DriveUtils.GetCompressedFileSize(fi.FullName);
 
-                    if (fileDict.TryGetValue(filePathHash, out int fileSizeHash) && fileSizeHash == fi.Length.GetHashCode())
+                    if (fileDict.TryGetValue(filePathHash, out uint dictFileSize) && dictFileSize == actualFileSize)
                     {
                         Logger.Log($"Skipping file: '{fi.FullName}' because it has been visited already and its size ('{fi.Length.GetMemoryString()}') did not change", 1, LogLevel.Debug);
                         Interlocked.Increment(ref fileCountSkipByNoChanges);
                         return;
                     }
 
-                    fileDict[filePathHash] = fi.Length.GetHashCode();
+                    fileDict[filePathHash] = actualFileSize;
 
                     Logger.Log($"Compressing file {fi.FullName}", 1, LogLevel.Debug);
                     Interlocked.Increment(ref fileCountProcessed);
@@ -363,7 +364,7 @@ namespace LZXCompactLightEngine
                     {
                         if (readerFileStream.Length > 0)
                         {
-                            fileDict = (ConcurrentDictionary<int, int>)binaryFormatter.Deserialize(readerFileStream);
+                            fileDict = (ConcurrentDictionary<int, uint>)binaryFormatter.Deserialize(readerFileStream);
                             readerFileStream.Close();
                         }
                     }

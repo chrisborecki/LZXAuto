@@ -49,6 +49,15 @@ namespace LZXCompactLightEngine
             return (long)(clustersize * (((ulong)logicalFileSize + clustersize - 1) / clustersize));
         }
 
+        [DllImport("kernel32.dll")]
+        private static extern uint GetCompressedFileSizeW([In, MarshalAs(UnmanagedType.LPWStr)] string lpFileName, [Out, MarshalAs(UnmanagedType.U4)] out uint lpFileSizeHigh);
+
+        public static uint GetCompressedFileSize(string fileName)
+        {
+            return GetCompressedFileSizeW(fileName, out uint dummy);
+        }
+
+
         public static string GetMemoryString(this long bytes)
         {
             int index = 0;
