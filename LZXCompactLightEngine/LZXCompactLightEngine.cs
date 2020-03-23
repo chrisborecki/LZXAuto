@@ -31,6 +31,7 @@ namespace LZXCompactLightEngine
         private int fileCountSkipByNoChanges = 0;
         private int fileCountSkippedByAttributes = 0;
         private int fileCountSkippedByExtension = 0;
+        private long diskSpaceSaved = 0;
         private int threadQueueLength;
 
         private string[] skipFileExtensions;
@@ -196,24 +197,15 @@ namespace LZXCompactLightEngine
                     $"Files processed by compact command line: { fileCountProcessed}{Environment.NewLine}" +
                     $"Total files visited: {totalFilesVisited}{Environment.NewLine}" +
                     $"Files in db: {fileDict?.Count ?? 0}{Environment.NewLine}" +
-                    $"Drive capacity: {DriveUtils.GetDriveCapacity(path).GetMemoryString()}{Environment.NewLine}" +
-                    $"Approx space saved during this session: {spaceSavedThisSession.GetMemoryString()}{Environment.NewLine}"
+                    $"Space saved during this session: {diskSpaceSaved.GetMemoryString()}{Environment.NewLine}"
                     , 2, LogLevel.General);
 
-                if (IsElevated)
-                {
-                    Logger.Log(
-                        $"Drive stat(beta): [{Environment.NewLine}" +
-                        $"Files uncompressed on drive (beta): {uncompressedFilesTotalSize.GetMemoryString()}{Environment.NewLine}" +
-                        $"Drive capacity: {DriveUtils.GetDriveCapacity(path).GetMemoryString()}{Environment.NewLine}" +
-                        $"Approx space saved on drive (beta): {spaceSaved.GetMemoryString()}{Environment.NewLine}" +
-                        $"] Drive stat (beta){Environment.NewLine}",
-                        0, LogLevel.General, false);
-                }
-                else
-                {
-                    Logger.Log("Cannot show additional stats because process is not running with Administrator rights.", 0, LogLevel.General, false);
-                }
+                //if (IsElevated)
+                //{
+                //}
+                //else
+                //{
+                //}
 
                 Logger.Log(
                     $"Perf stats:{Environment.NewLine}" +
@@ -253,21 +245,26 @@ namespace LZXCompactLightEngine
                     Logger.Log("", 4, LogLevel.Debug);
 
                     int filePathHash = fi.FullName.GetHashCode();
-                    uint actualFileSize = DriveUtils.GetCompressedFileSize(fi.FullName);
+                    uint currentFileSize1 = DriveUtils.GetCompressedFileSize(fi.FullName);
 
-                    if (fileDict.TryGetValue(filePathHash, out uint dictFileSize) && dictFileSize == actualFileSize)
+                    if (fileDict.TryGetValue(filePathHash, out uint dictFileSize) && dictFileSize == currentFileSize1)
                     {
                         Logger.Log($"Skipping file: '{fi.FullName}' because it has been visited already and its size ('{fi.Length.GetMemoryString()}') did not change", 1, LogLevel.Debug);
                         Interlocked.Increment(ref fileCountSkipByNoChanges);
                         return;
                     }
 
-                    fileDict[filePathHash] = actualFileSize;
-
                     Logger.Log($"Compressing file {fi.FullName}", 1, LogLevel.Debug);
                     Interlocked.Increment(ref fileCountProcessed);
 
                     string outPut = CompactCommand($"/c /exe:LZX {(useForceCompress ? "/f" : "")} \"{fi.FullName}\"");
+
+                    uint currentFileSize2 = DriveUtils.GetCompressedFileSize(fi.FullName);
+                    fileDict[filePathHash] = currentFileSize2;
+
+                    long fileDiskSize1 = DriveUtils.GetDiskUncompressedFileSize(currentFileSize1, fi.FullName);
+                    long fileDiskSize2 = DriveUtils.GetDiskUncompressedFileSize(currentFileSize2, fi.FullName);
+                    Interlocked.Add(ref diskSpaceSaved, fileDiskSize1 - fileDiskSize2);
 
                     Logger.Log(outPut, 2, LogLevel.Debug);
                 }
