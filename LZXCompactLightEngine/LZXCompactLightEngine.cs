@@ -32,6 +32,7 @@ namespace LZXCompactLightEngine
         private int fileCountSkippedByAttributes = 0;
         private int fileCountSkippedByExtension = 0;
         private long diskSpaceSaved = 0;
+        private long bytesWritten = 0;
         private int threadQueueLength;
 
         private string[] skipFileExtensions;
@@ -195,9 +196,11 @@ namespace LZXCompactLightEngine
                     $"Files skipped by extension: { fileCountSkippedByExtension}{Environment.NewLine}" +
                     $"Files skipped by no change: { fileCountSkipByNoChanges}{Environment.NewLine}" +
                     $"Files processed by compact command line: { fileCountProcessed}{Environment.NewLine}" +
-                    $"Total files visited: {totalFilesVisited}{Environment.NewLine}" +
                     $"Files in db: {fileDict?.Count ?? 0}{Environment.NewLine}" +
-                    $"Space saved during this session: {diskSpaceSaved.GetMemoryString()}{Environment.NewLine}"
+                    $"Files visited: {totalFilesVisited}{Environment.NewLine}" +
+                    $"{Environment.NewLine}" +
+                    $"Space saved during this session: {diskSpaceSaved.GetMemoryString()}{Environment.NewLine}" +
+                    $"Bytes written: {bytesWritten.GetMemoryString()}{Environment.NewLine}"
                     , 2, LogLevel.General);
 
                 //if (IsElevated)
@@ -264,7 +267,12 @@ namespace LZXCompactLightEngine
 
                     long fileDiskSize1 = DriveUtils.GetDiskUncompressedFileSize(currentFileSize1, fi.FullName);
                     long fileDiskSize2 = DriveUtils.GetDiskUncompressedFileSize(currentFileSize2, fi.FullName);
+
+                    if (fileDiskSize2 > fileDiskSize1)
+                        Logger.Log($"fileDiskSize2: {fileDiskSize2} > fileDiskSize1 {fileDiskSize1}, fileName: {fi.FullName}", 1, LogLevel.General);
+
                     Interlocked.Add(ref diskSpaceSaved, fileDiskSize1 - fileDiskSize2);
+                    Interlocked.Add(ref bytesWritten, fileDiskSize2);
 
                     Logger.Log(outPut, 2, LogLevel.Debug);
                 }
