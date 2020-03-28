@@ -199,8 +199,8 @@ namespace LZXCompactLightEngine
 					$"Bytes read: {bytesRead.GetMemoryString()}{Environment.NewLine}" +
 					$"Bytes written: {bytesWritten.GetMemoryString()}{Environment.NewLine}" +
 					$"Space savings bytes: {(bytesRead - bytesWritten).GetMemoryString()}{Environment.NewLine}" +
-					$"Space savings %: {(1 - bytesWritten / bytesRead).GetMemoryString()}{Environment.NewLine}" +
-					$"Compression ratio: {(bytesRead / bytesWritten).GetMemoryString()}{Environment.NewLine}"
+					$"Space savings %: {1 - (decimal)bytesWritten / bytesRead}{Environment.NewLine}" +
+					$"Compression ratio: {(decimal)bytesRead / bytesWritten}{Environment.NewLine}"
 					, 2, LogLevel.General);
 
 				Logger.Log(
