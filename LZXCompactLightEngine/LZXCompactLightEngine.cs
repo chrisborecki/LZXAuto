@@ -146,7 +146,7 @@ namespace LZXCompactLightEngine
 					}
 					catch (UnauthorizedAccessException)
 					{
-						Logger.Log($"Access failed to folder: {di.FullName}", 2, LogLevel.Info | LogLevel.General);
+						Logger.Log($"Access failed to folder: {di.FullName}", 2, LogLevel.General);
 					}
 					catch (Exception ex)
 					{
@@ -199,8 +199,8 @@ namespace LZXCompactLightEngine
 					$"Bytes read: {bytesRead.GetMemoryString()}{Environment.NewLine}" +
 					$"Bytes written: {bytesWritten.GetMemoryString()}{Environment.NewLine}" +
 					$"Space savings bytes: {(bytesRead - bytesWritten).GetMemoryString()}{Environment.NewLine}" +
-					$"Space savings %: {1 - (decimal)bytesWritten / bytesRead}{Environment.NewLine}" +
-					$"Compression ratio: {(decimal)bytesRead / bytesWritten}{Environment.NewLine}"
+					$"Space savings %: {(1 - (decimal)bytesWritten / bytesRead).ToString("0.00")}{Environment.NewLine}" +
+					$"Compression ratio: {((decimal)bytesRead / bytesWritten).ToString("0.00")}{Environment.NewLine}"
 					, 2, LogLevel.General);
 
 				Logger.Log(
