@@ -40,7 +40,7 @@ namespace LZXCompactLightEngine
             return GetDriveCapacity(path) - GetDriveFreeSpace(path);
         }
 
-        public static long GetDiskUncompressedFileSize(long logicalFileSize, string path)
+        public static long GetDiskOccupiedSpace(long logicalFileSize, string path)
         {
             if (lpBytesPerSector == 0)
                 ReadDiskParams(path);
@@ -52,7 +52,7 @@ namespace LZXCompactLightEngine
         [DllImport("kernel32.dll")]
         private static extern uint GetCompressedFileSizeW([In, MarshalAs(UnmanagedType.LPWStr)] string lpFileName, [Out, MarshalAs(UnmanagedType.U4)] out uint lpFileSizeHigh);
 
-        public static uint GetCompressedFileSize(string fileName)
+        public static uint GetPhysicalFileSize(string fileName)
         {
             return GetCompressedFileSizeW(fileName, out uint dummy);
         }
