@@ -30,13 +30,14 @@ namespace LZXCompactLightEngine
         private int fileCountSkipByNoChange = 0;
         private int fileCountSkippedByAttributes = 0;
         private int fileCountSkippedByExtension = 0;
+        private int dictEntriesCount0 = 0;
         private int threadQueueLength;
 
-        private long bytesRead = 0;
-        private long bytesWritten = 0;
+        private long compactBytesRead = 0;
+        private long compactBytesWritten = 0;
 
-        private long diskBytesLogical = 0;
-        private long diskBytesPhysical = 0;
+        private long totalDiskBytesLogical = 0;
+        private long totalDiskBytesPhysical = 0;
 
         private string[] skipFileExtensions;
 
@@ -196,20 +197,21 @@ namespace LZXCompactLightEngine
                     $"Files skipped by no change: { fileCountSkipByNoChange}{Environment.NewLine}" +
                     $"Files processed by compact command line: { fileCountProcessedByCompactCommand}{Environment.NewLine}" +
                     $"Files in db: {fileDict?.Count ?? 0}{Environment.NewLine}" +
+                    $"Files in db delta: {(fileDict?.Count ?? 0) - dictEntriesCount0}{Environment.NewLine}" +
                     $"Files visited: {totalFilesVisited}{Environment.NewLine}" +
                     $"{Environment.NewLine}" +
 
-                    $"Bytes read: {bytesRead.GetMemoryString()}{Environment.NewLine}" +
-                    $"Bytes written: {bytesWritten.GetMemoryString()}{Environment.NewLine}" +
-                    $"Space savings bytes: {(bytesRead - bytesWritten).GetMemoryString()}{Environment.NewLine}" +
-                    $"Space savings: {(1 - (decimal)bytesWritten / bytesRead) * 100m:0.00}%{Environment.NewLine}" +
-                    $"Compression ratio: {(decimal)bytesRead / bytesWritten:0.00}{Environment.NewLine}{Environment.NewLine}" +
+                    $"Bytes read: {compactBytesRead.GetMemoryString()}{Environment.NewLine}" +
+                    $"Bytes written: {compactBytesWritten.GetMemoryString()}{Environment.NewLine}" +
+                    $"Space savings bytes: {(compactBytesRead - compactBytesWritten).GetMemoryString()}{Environment.NewLine}" +
+                    $"Space savings: {(1 - (decimal)compactBytesWritten / compactBytesRead) * 100m:0.00}%{Environment.NewLine}" +
+                    $"Compression ratio: {(decimal)compactBytesRead / compactBytesWritten:0.00}{Environment.NewLine}{Environment.NewLine}" +
 
                     $"Disk stat:{Environment.NewLine}"+
-                    $"Files logical size: {diskBytesLogical.GetMemoryString()}{Environment.NewLine}"+
-                    $"Files phisical size: {diskBytesPhysical.GetMemoryString()}{Environment.NewLine}"+
-                    $"Space savings %:{(1 - (decimal)diskBytesPhysical / diskBytesLogical) * 100m:0.00}{Environment.NewLine}" +
-                    $"Compression ratio: {(decimal)diskBytesLogical / diskBytesPhysical:0.00}"
+                    $"Files logical size: {totalDiskBytesLogical.GetMemoryString()}{Environment.NewLine}"+
+                    $"Files phisical size: {totalDiskBytesPhysical.GetMemoryString()}{Environment.NewLine}"+
+                    $"Space savings: {(1 - (decimal)totalDiskBytesPhysical / totalDiskBytesLogical) * 100m:0.00}%{Environment.NewLine}" +
+                    $"Compression ratio: {(decimal)totalDiskBytesLogical / totalDiskBytesPhysical:0.00}"
                     , 2, LogLevel.General);
 
                 Logger.Log(
@@ -227,19 +229,19 @@ namespace LZXCompactLightEngine
                 uint physicalSize1 = DriveUtils.GetPhysicalFileSize(fi.FullName);
                 long physicalSize1_Clusters = DriveUtils.GetDiskOccupiedSpace(physicalSize1, fi.FullName);
 
-                Interlocked.Add(ref diskBytesLogical, DriveUtils.GetDiskOccupiedSpace(fi.Length, fi.FullName));
+                Interlocked.Add(ref totalDiskBytesLogical, DriveUtils.GetDiskOccupiedSpace(fi.Length, fi.FullName));
 
                 if (skipFileExtensions.Any(c => c == fi.Extension))
                 {
                     Interlocked.Increment(ref fileCountSkippedByExtension);
-                    Interlocked.Add(ref diskBytesPhysical, physicalSize1_Clusters);
+                    Interlocked.Add(ref totalDiskBytesPhysical, physicalSize1_Clusters);
                     return;
                 }
 
                 if (fi.Attributes.HasFlag(FileAttributes.System))
                 {
                     Interlocked.Increment(ref fileCountSkippedByAttributes);
-                    Interlocked.Add(ref diskBytesPhysical, physicalSize1_Clusters);
+                    Interlocked.Add(ref totalDiskBytesPhysical, physicalSize1_Clusters);
                     return;
                 }
 
@@ -261,6 +263,7 @@ namespace LZXCompactLightEngine
                     {
                         Logger.Log($"Skipping file: '{fi.FullName}' because it has been visited already and its size ('{fi.Length.GetMemoryString()}') did not change", 1, LogLevel.Debug);
                         Interlocked.Increment(ref fileCountSkipByNoChange);
+                        Interlocked.Add(ref totalDiskBytesPhysical, physicalSize1_Clusters);
                         return;
                     }
 
@@ -277,9 +280,9 @@ namespace LZXCompactLightEngine
                     if (physicalSize2_Clusters > physicalSize1_Clusters)
                         Logger.Log($"fileDiskSize2: {physicalSize2_Clusters} > fileDiskSize1 {physicalSize1_Clusters}, fileName: {fi.FullName}", 1, LogLevel.General);
 
-                    Interlocked.Add(ref bytesRead, physicalSize1_Clusters);
-                    Interlocked.Add(ref bytesWritten, physicalSize2_Clusters);
-                    Interlocked.Add(ref diskBytesPhysical, physicalSize2_Clusters);
+                    Interlocked.Add(ref compactBytesRead, physicalSize1_Clusters);
+                    Interlocked.Add(ref compactBytesWritten, physicalSize2_Clusters);
+                    Interlocked.Add(ref totalDiskBytesPhysical, physicalSize2_Clusters);
 
                     Logger.Log(outPut, 2, LogLevel.Debug);
                 }
@@ -381,7 +384,9 @@ namespace LZXCompactLightEngine
                         }
                     }
 
-                    Logger.Log("Loaded from file");
+                    dictEntriesCount0 = fileDict.Count;
+
+                    Logger.Log($"Loaded from file ({dictEntriesCount0} entries)");
                 }
                 catch (Exception ex)
                 {
