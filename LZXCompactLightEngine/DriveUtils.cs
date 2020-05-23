@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -40,23 +41,28 @@ namespace LZXCompactLightEngine
             return GetDriveCapacity(path) - GetDriveFreeSpace(path);
         }
 
-        public static long GetDiskOccupiedSpace(long logicalFileSize, string path)
+        public static ulong GetDiskOccupiedSpace(ulong logicalFileSize, string path)
         {
             if (lpBytesPerSector == 0)
                 ReadDiskParams(path);
 
             ulong clustersize = lpBytesPerSector * lpSectorsPerCluster;
-            return (long)(clustersize * (((ulong)logicalFileSize + clustersize - 1) / clustersize));
+            return (ulong)(clustersize * (((ulong)logicalFileSize + clustersize - 1) / clustersize));
         }
 
         [DllImport("kernel32.dll")]
         private static extern uint GetCompressedFileSizeW([In, MarshalAs(UnmanagedType.LPWStr)] string lpFileName, [Out, MarshalAs(UnmanagedType.U4)] out uint lpFileSizeHigh);
 
-        public static uint GetPhysicalFileSize(string fileName)
+        public static ulong GetPhysicalFileSize(string fileName)
         {
-            return GetCompressedFileSizeW(fileName, out uint dummy);
+            uint high, low;
+            low = GetCompressedFileSizeW(fileName, out high);
+            int error = Marshal.GetLastWin32Error();
+            if (low == 0xFFFFFFFF && error != 0)
+                throw new Win32Exception(error, "Error while getting physical file size");
+            else
+                return ((ulong)high << 32) + low;
         }
-
 
         public static string GetMemoryString(this long bytes)
         {
@@ -71,6 +77,11 @@ namespace LZXCompactLightEngine
             }
             while (Math.Floor(value) > 0 && index < BinaryPrefix.Length);
             return text;
+        }
+
+        public static string GetMemoryString(this ulong bytes)
+        {
+            return GetMemoryString((long)bytes);
         }
     }
 }
