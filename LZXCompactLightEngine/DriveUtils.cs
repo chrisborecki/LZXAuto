@@ -59,7 +59,8 @@ namespace LZXCompactLightEngine
             low = GetCompressedFileSizeW(fileName, out high);
             int error = Marshal.GetLastWin32Error();
             if (low == 0xFFFFFFFF && error != 0)
-                throw new Win32Exception(error, "Error while getting physical file size");
+                return 0;
+                //throw new Win32Exception(error, "Error while getting physical file size");
             else
                 return ((ulong)high << 32) + low;
         }
