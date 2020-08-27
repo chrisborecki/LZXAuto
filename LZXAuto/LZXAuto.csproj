@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <StartupObject>LZXAuto.Program</StartupObject>
+    <Authors>Christopher Borecki</Authors>
+    <Company>Christopher Borecki</Company>
+    <Description>Windows 10 LZX auto-compressor</Description>
+    <PackageProjectUrl>https://github.com/chrisborecki/LZXAuto</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/chrisborecki/LZXAuto</RepositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LZXAutoEngine\LZXAutoEngine.csproj" />
+  </ItemGroup>
+
+</Project>

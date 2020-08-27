@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{37A70A5F-7716-45EB-ADD4-564FB692477E}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>LZXCompactLight</RootNamespace>
-    <AssemblyName>LZXCompactLight</AssemblyName>
+    <RootNamespace>LZXAuto</RootNamespace>
+    <AssemblyName>LZXAuto</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -81,25 +81,25 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="LZXCompactLight.cs" />
+    <Compile Include="LZXAuto.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="LZXCompactLightConfig.json">
+    <None Include="LZXAutoConfig.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Include="packages.config" />
     <None Include="Properties\app.manifest" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\LZXCompactLightEngine\LZXCompactLightEngine.csproj">
+    <ProjectReference Include="..\LZXAutoEngine\LZXAutoEngine.csproj">
       <Project>{21401178-D80D-495E-915F-2D29359041F0}</Project>
-      <Name>LZXCompactLightEngine</Name>
+      <Name>LZXAutoEngine</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="LZXCompactLightTask.xml">
+    <Content Include="LZXAutoTask.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Todo.txt" />

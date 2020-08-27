@@ -1,11 +1,4 @@
-﻿/*  
- *  LZX compression helper for Windows 10
- *  Copyright (c) 2019 Christopher Borecki
- * 
- *  MIT Licence
- * 
- * */
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
@@ -16,9 +9,9 @@ using System.Security.Principal;
 using System.Text;
 using System.Threading;
 
-namespace LZXCompactLightEngine
+namespace LZXAutoEngine
 {
-	public class LZXCompactLightEngine
+	public class LZXAutoEngine
 	{
 		private ConcurrentDictionary<int, uint> fileDict = new ConcurrentDictionary<int, uint>();
 
@@ -60,7 +53,7 @@ namespace LZXCompactLightEngine
 			}
 		}
 
-		public LZXCompactLightEngine()
+		public LZXAutoEngine()
 		{
 			//timer = new Timer(FileSaveTimerCallback, null, fileSaveTimerMs, fileSaveTimerMs);
 		}
@@ -69,7 +62,7 @@ namespace LZXCompactLightEngine
 		{
 			skipFileExtensions = skipFileExtensionsArr ?? new string[] { };
 
-			Logger.Log($"Starting new compressing session. LZXCompactLight version: {Assembly.GetEntryAssembly().GetName().Version}", 20);
+			Logger.Log($"Starting new compressing session. LZXAuto version: {Assembly.GetEntryAssembly().GetName().Version}", 20);
 			Logger.Log($"Running in Administrator mode: {IsElevated}", 2);
 			Logger.Log($"Starting path {path}", 2);
 
@@ -111,11 +104,11 @@ namespace LZXCompactLightEngine
 					}
 				}
 
-				foreach (var di in dirTop.EnumerateDirectories("*"))
+				foreach (var di in dirTop.EnumerateDirectories("*", new EnumerationOptions() { RecurseSubdirectories = true, ReturnSpecialDirectories = false }))
 				{
 					try
 					{
-						foreach (var fi in di.EnumerateFiles("*", SearchOption.AllDirectories))
+						foreach (var fi in di.EnumerateFiles("*", new EnumerationOptions() { AttributesToSkip = FileAttributes.Directory }))
 						{
 							if (cancelToken.IsCancellationRequested)
 							{
@@ -324,7 +317,7 @@ namespace LZXCompactLightEngine
 			}
 			catch (InvalidOperationException)
 			{
-				Logger.Log("Process Compact exited before setting its pririty. Nothing to worry about.", 3, LogLevel.Debug);
+				Logger.Log("Process Compact exited before setting its priority. Nothing to worry about.", 3, LogLevel.Debug);
 			}
 
 			string outPut = proc.StandardOutput.ReadToEnd();
@@ -424,6 +417,4 @@ namespace LZXCompactLightEngine
 			}
 		}
 	}
-
-
 }
