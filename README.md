@@ -1,8 +1,8 @@
-# LZXCompactLight
+# LZXAuto
 
 Automatically compress files to NTFS LZX compression with minimal disk write cycles.
                 
-<b/>Syntax:</b> LZXCompactLight [/log:mode] [/resetDb] [/scheduleOn] [/scheduleOff] [/? | /help] [filePath]
+<b/>Syntax:</b> LZXAuto [/log:mode] [/resetDb] [/scheduleOn] [/scheduleOff] [/? | /help] [filePath]
 
 <b>Options:</b>
 
@@ -14,7 +14,7 @@ Automatically compress files to NTFS LZX compression with minimal disk write cyc
 
 <b>/resetDb</b> - resets db. On next run, all files will be traversed by Compact command.
 
-<b>/scheduleOn</b> - enables Task Scheduler entry to run LZXCompactLight when computer is idle for 10 minutes. Task runs daily.
+<b>/scheduleOn</b> - enables Task Scheduler entry to run LZXAuto when computer is idle for 10 minutes. Task runs daily.
 
 <b>/scheduleOff</b> - disables Task Scheduler entry
 
@@ -33,7 +33,7 @@ When Compact command is being run on file already LZX-compressed, it will not tr
 However, if file is not compressible (like .jpg image), Compact will try to recompress it every time, writing temp data to disk.
 
 This is an issue on SSD drives, because of limited write cycles.
-LZXCompactLight keeps record of file name and its last seen size. If the file has not changed since last LZXCompactLight run, it will be skipped. 
+LZXAuto keeps record of file name and its last seen size. If the file has not changed since last LZXAuto run, it will be skipped. 
 This saves SSD write cycles and also speeds up processing time, as on second run only newly updated / inserted files are processed.
 
 If folder is found with NTFS compression enabled, after processing it will be marked as non-compressed. 
@@ -43,4 +43,4 @@ Iterating through files is multithreaded, one file per CPU logical core.
 For larger file accessibility, this command should be run with Adminstrator priviledges.
 
 <b>Typical use:</b>
-LZXCompactLight /scheduleOn c:\ 
+LZXAuto /scheduleOn c:\ 
