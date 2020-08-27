@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -13,6 +14,7 @@ namespace LZXAutoEngine
 {
 	public class LZXAutoEngine
 	{
+		
 		private ConcurrentDictionary<int, uint> fileDict = new ConcurrentDictionary<int, uint>();
 
 		//private const int fileSaveTimerMs = (int)30e3; //30 seconds
@@ -343,7 +345,8 @@ namespace LZXAutoEngine
 					{
 						Logger.Log("Saving file...", 1, LogLevel.Debug);
 
-						binaryFormatter.Serialize(writerFileStream, fileDict);
+						var dict = fileDict.ToDictionary(a => a.Key, b => b.Value);
+						binaryFormatter.Serialize(writerFileStream, dict);
 
 						Logger.Log($"File saved, dictCount: {fileDict.Count}, fileSize: {writerFileStream.Length}", 1, LogLevel.Debug);
 
@@ -370,7 +373,9 @@ namespace LZXAutoEngine
 					{
 						if (readerFileStream.Length > 0)
 						{
-							fileDict = (ConcurrentDictionary<int, uint>)binaryFormatter.Deserialize(readerFileStream);
+							var dict = binaryFormatter.Deserialize(readerFileStream);
+							fileDict = new ConcurrentDictionary<int, uint>((Dictionary<int, uint>)dict);
+							
 							readerFileStream.Close();
 						}
 					}
