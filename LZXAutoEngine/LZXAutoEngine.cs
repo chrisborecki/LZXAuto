@@ -72,7 +72,7 @@ namespace LZXAutoEngine
 
 			try
 			{
-				LoadDictFromFile();
+				fileDict = LoadDictFromFile(dbFileName);
 
 				DirectoryInfo dirTop = new DirectoryInfo(path);
 
@@ -178,12 +178,18 @@ namespace LZXAutoEngine
 
 				Logger.Log("Completed");
 
-				SaveDictToFile();
+				SaveDictToFile(dbFileName, fileDict);
 
 				TimeSpan ts = DateTime.Now.Subtract(startTimeStamp);
 				int totalFilesVisited = fileCountProcessedByCompactCommand + fileCountSkipByNoChange + fileCountSkippedByAttributes + fileCountSkippedByExtension;
 
 				StringBuilder statStr = new StringBuilder();
+				
+				string spaceSavings = "-";
+				if (compactCommandBytesRead > 0) spaceSavings = $"{ (1 - (decimal)compactCommandBytesWritten / compactCommandBytesRead) * 100m:0.00}%";
+
+				string compressionRatio = "-";
+				if (compactCommandBytesWritten > 0) compressionRatio = $"{(decimal)compactCommandBytesRead / compactCommandBytesWritten:0.00}";
 
 				Logger.Log(
 					$"Stats for this session: {Environment.NewLine}" +
@@ -199,8 +205,8 @@ namespace LZXAutoEngine
 					$"Bytes read: {compactCommandBytesRead.GetMemoryString()}{Environment.NewLine}" +
 					$"Bytes written: {compactCommandBytesWritten.GetMemoryString()}{Environment.NewLine}" +
 					$"Space savings bytes: {(compactCommandBytesRead - compactCommandBytesWritten).GetMemoryString()}{Environment.NewLine}" +
-					$"Space savings: {(1 - (decimal)compactCommandBytesWritten / compactCommandBytesRead) * 100m:0.00}%{Environment.NewLine}" +
-					$"Compression ratio: {(decimal)compactCommandBytesRead / compactCommandBytesWritten:0.00}{Environment.NewLine}{Environment.NewLine}" +
+					$"Space savings: {spaceSavings}{Environment.NewLine}" +
+					$"Compression ratio: { compressionRatio }{Environment.NewLine}{Environment.NewLine}" +
 
 					$"Disk stat:{Environment.NewLine}" +
 					$"Files logical size: {totalDiskBytesLogical.GetMemoryString()}{Environment.NewLine}" +
@@ -251,8 +257,8 @@ namespace LZXAutoEngine
 				{
 					Logger.Log("", 4, LogLevel.Debug);
 
-					int filePathHash = fi.FullName.GetHashCode();
 
+					int filePathHash = fi.FullName.GetDeterministicHashCode();
 
 					if (fileDict.TryGetValue(filePathHash, out uint dictFileSize) && dictFileSize == fi.Length)
 					{
@@ -268,7 +274,7 @@ namespace LZXAutoEngine
 					string outPut = CompactCommand($"/c /exe:LZX {(useForceCompress ? "/f" : "")} \"{fi.FullName}\"");
 
 					ulong physicalSize2_Clusters = DriveUtils.GetPhysicalFileSize(fi.FullName);
-					fileDict[filePathHash] = (uint)fi.Length;
+					fileDict[filePathHash] = unchecked((uint)fi.Length);
 
 					if (physicalSize2_Clusters > physicalSize1_Clusters)
 						Logger.Log($"fileDiskSize2: {physicalSize2_Clusters} > fileDiskSize1 {physicalSize1_Clusters}, fileName: {fi.FullName}", 1, LogLevel.General);
@@ -334,21 +340,21 @@ namespace LZXAutoEngine
 			File.Delete(dbFileName);
 		}
 
-		private void SaveDictToFile()
+		public void SaveDictToFile(string fileName, ConcurrentDictionary<int, uint> concDict)
 		{
 			try
 			{
 				lock (lockObject)
 				{
 					BinaryFormatter binaryFormatter = new BinaryFormatter();
-					using (FileStream writerFileStream = new FileStream(dbFileName, FileMode.Create, FileAccess.Write))
+					using (FileStream writerFileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write))
 					{
 						Logger.Log("Saving file...", 1, LogLevel.Debug);
 
-						var dict = fileDict.ToDictionary(a => a.Key, b => b.Value);
+						var dict = concDict.ToDictionary(a => a.Key, b => b.Value);
 						binaryFormatter.Serialize(writerFileStream, dict);
 
-						Logger.Log($"File saved, dictCount: {fileDict.Count}, fileSize: {writerFileStream.Length}", 1, LogLevel.Debug);
+						Logger.Log($"File saved, dictCount: {concDict.Count}, fileSize: {writerFileStream.Length}", 1, LogLevel.Debug);
 
 						writerFileStream.Close();
 					}
@@ -360,27 +366,29 @@ namespace LZXAutoEngine
 			}
 		}
 
-		private void LoadDictFromFile()
+		public ConcurrentDictionary<int, uint> LoadDictFromFile(string fileName)
 		{
-			if (File.Exists(dbFileName))
+			ConcurrentDictionary<int, uint> retVal = new ConcurrentDictionary<int, uint>();
+
+			if (File.Exists(fileName))
 			{
 				try
 				{
 					Logger.Log("Dictionary file found");
 
 					BinaryFormatter binaryFormatter = new BinaryFormatter();
-					using (FileStream readerFileStream = new FileStream(dbFileName, FileMode.Open, FileAccess.Read))
+					using (FileStream readerFileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read))
 					{
 						if (readerFileStream.Length > 0)
 						{
 							var dict = binaryFormatter.Deserialize(readerFileStream);
-							fileDict = new ConcurrentDictionary<int, uint>((Dictionary<int, uint>)dict);
+							retVal = new ConcurrentDictionary<int, uint>((Dictionary<int, uint>)dict);
 							
 							readerFileStream.Close();
 						}
 					}
 
-					dictEntriesCount0 = fileDict.Count;
+					dictEntriesCount0 = retVal?.Count ?? 0;
 
 					Logger.Log($"Loaded from file ({dictEntriesCount0} entries)");
 				}
@@ -396,6 +404,8 @@ namespace LZXAutoEngine
 			{
 				Logger.Log("DB file not found");
 			}
+
+			return retVal;
 		}
 
 		//private void FileSaveTimerCallback(object state)
