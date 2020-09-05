@@ -14,32 +14,30 @@ namespace LZXAutoEngine
 {
 	public class LZXAutoEngine
 	{
-		
+
 		private ConcurrentDictionary<int, uint> fileDict = new ConcurrentDictionary<int, uint>();
 
 		//private const int fileSaveTimerMs = (int)30e3; //30 seconds
 		private const int treadPoolWaitMs = 200;
 		private const string dbFileName = "FileDict.db";
 
-		private int fileCountProcessedByCompactCommand = 0;
-		private int fileCountSkipByNoChange = 0;
-		private int fileCountSkippedByAttributes = 0;
-		private int fileCountSkippedByExtension = 0;
-		private int dictEntriesCount0 = 0;
+		private uint fileCountProcessedByCompactCommand = 0;
+		private uint fileCountSkipByNoChange = 0;
+		private uint fileCountSkippedByAttributes = 0;
+		private uint fileCountSkippedByExtension = 0;
+		private uint dictEntriesCount0 = 0;
 		private int threadQueueLength;
 
-		private long compactCommandBytesRead = 0;
-		private long compactCommandBytesWritten = 0;
+		private ulong compactCommandBytesRead = 0;
+		private ulong compactCommandBytesWritten = 0;
 
-		private long totalDiskBytesLogical = 0;
-		private long totalDiskBytesPhysical = 0;
+		private ulong totalDiskBytesLogical = 0;
+		private ulong totalDiskBytesPhysical = 0;
 
 		private string[] skipFileExtensions;
 
 		private readonly CancellationTokenSource cancelToken = new CancellationTokenSource();
 		private readonly int maxQueueLength = Environment.ProcessorCount * 16;
-		private readonly object lockObject = new object();
-		//private readonly Timer timer;
 
 		public Logger Logger { get; set; } = new Logger(LogLevel.General);
 
@@ -181,10 +179,10 @@ namespace LZXAutoEngine
 				SaveDictToFile(dbFileName, fileDict);
 
 				TimeSpan ts = DateTime.Now.Subtract(startTimeStamp);
-				int totalFilesVisited = fileCountProcessedByCompactCommand + fileCountSkipByNoChange + fileCountSkippedByAttributes + fileCountSkippedByExtension;
+				uint totalFilesVisited = fileCountProcessedByCompactCommand + fileCountSkipByNoChange + fileCountSkippedByAttributes + fileCountSkippedByExtension;
 
 				StringBuilder statStr = new StringBuilder();
-				
+
 				string spaceSavings = "-";
 				if (compactCommandBytesRead > 0) spaceSavings = $"{ (1 - (decimal)compactCommandBytesWritten / compactCommandBytesRead) * 100m:0.00}%";
 
@@ -223,6 +221,7 @@ namespace LZXAutoEngine
 			}
 		}
 
+
 		private void ProcessFile(FileInfo fi)
 		{
 			try
@@ -230,19 +229,19 @@ namespace LZXAutoEngine
 				ulong physicalSize1_Clusters = DriveUtils.GetPhysicalFileSize(fi.FullName);
 				ulong logicalSize_Clusters = DriveUtils.GetDiskOccupiedSpace((ulong)fi.Length, fi.FullName);
 
-				Interlocked.Add(ref totalDiskBytesLogical, (long)logicalSize_Clusters);
+				ThreadUtils.InterlockedAdd(ref totalDiskBytesLogical, logicalSize_Clusters);
 
 				if (skipFileExtensions.Any(c => c == fi.Extension))
 				{
-					Interlocked.Increment(ref fileCountSkippedByExtension);
-					Interlocked.Add(ref totalDiskBytesPhysical, (long)physicalSize1_Clusters);
+					ThreadUtils.InterlockedIncrement(ref fileCountSkippedByExtension);
+					ThreadUtils.InterlockedAdd(ref totalDiskBytesPhysical, physicalSize1_Clusters);
 					return;
 				}
 
 				if (fi.Attributes.HasFlag(FileAttributes.System))
 				{
-					Interlocked.Increment(ref fileCountSkippedByAttributes);
-					Interlocked.Add(ref totalDiskBytesPhysical, (long)physicalSize1_Clusters);
+					ThreadUtils.InterlockedIncrement(ref fileCountSkippedByAttributes);
+					ThreadUtils.InterlockedAdd(ref totalDiskBytesPhysical, physicalSize1_Clusters);
 					return;
 				}
 
@@ -263,13 +262,13 @@ namespace LZXAutoEngine
 					if (fileDict.TryGetValue(filePathHash, out uint dictFileSize) && dictFileSize == fi.Length)
 					{
 						Logger.Log($"Skipping file: '{fi.FullName}' because it has been visited already and its size ('{fi.Length.GetMemoryString()}') did not change", 1, LogLevel.Debug);
-						Interlocked.Increment(ref fileCountSkipByNoChange);
-						Interlocked.Add(ref totalDiskBytesPhysical, (long)physicalSize1_Clusters);
+						ThreadUtils.InterlockedIncrement(ref fileCountSkipByNoChange);
+						ThreadUtils.InterlockedAdd(ref totalDiskBytesPhysical, physicalSize1_Clusters);
 						return;
 					}
 
 					Logger.Log($"Compressing file {fi.FullName}", 1, LogLevel.Debug);
-					Interlocked.Increment(ref fileCountProcessedByCompactCommand);
+					ThreadUtils.InterlockedIncrement(ref fileCountProcessedByCompactCommand);
 
 					string outPut = CompactCommand($"/c /exe:LZX {(useForceCompress ? "/f" : "")} \"{fi.FullName}\"");
 
@@ -279,9 +278,9 @@ namespace LZXAutoEngine
 					if (physicalSize2_Clusters > physicalSize1_Clusters)
 						Logger.Log($"fileDiskSize2: {physicalSize2_Clusters} > fileDiskSize1 {physicalSize1_Clusters}, fileName: {fi.FullName}", 1, LogLevel.General);
 
-					Interlocked.Add(ref compactCommandBytesRead, (long)physicalSize1_Clusters);
-					Interlocked.Add(ref compactCommandBytesWritten, (long)physicalSize2_Clusters);
-					Interlocked.Add(ref totalDiskBytesPhysical, (long)physicalSize2_Clusters);
+					ThreadUtils.InterlockedAdd(ref compactCommandBytesRead, physicalSize1_Clusters);
+					ThreadUtils.InterlockedAdd(ref compactCommandBytesWritten, physicalSize2_Clusters);
+					ThreadUtils.InterlockedAdd(ref totalDiskBytesPhysical, physicalSize2_Clusters);
 
 					Logger.Log(outPut, 2, LogLevel.Debug);
 				}
@@ -344,7 +343,7 @@ namespace LZXAutoEngine
 		{
 			try
 			{
-				lock (lockObject)
+				lock (ThreadUtils.lockObject)
 				{
 					BinaryFormatter binaryFormatter = new BinaryFormatter();
 					using (FileStream writerFileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write))
@@ -383,12 +382,12 @@ namespace LZXAutoEngine
 						{
 							var dict = binaryFormatter.Deserialize(readerFileStream);
 							retVal = new ConcurrentDictionary<int, uint>((Dictionary<int, uint>)dict);
-							
+
 							readerFileStream.Close();
 						}
 					}
 
-					dictEntriesCount0 = retVal?.Count ?? 0;
+					dictEntriesCount0 = (uint)(retVal?.Count ?? 0);
 
 					Logger.Log($"Loaded from file ({dictEntriesCount0} entries)");
 				}
